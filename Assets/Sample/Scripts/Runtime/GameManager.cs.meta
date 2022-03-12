@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fd727d93db02745eea83d5aa1abb4ccf
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - assetUIStartupView: {fileID: 3519999000709677020, guid: 3f2af4f210a9cf645aac0f17bc665e4d,
+      type: 3}
+  - assetUILobbyView: {instanceID: 0}
+  - assetUIGamePlayView: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
