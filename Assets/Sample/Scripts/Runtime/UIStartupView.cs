@@ -41,7 +41,7 @@ namespace AillieoUtils.EasyLAN.Sample
                 host = "host";
             }
 
-            await NetWork.Listen(host, 23333, cancellationTokenSource.Token);
+            await NetGameMaker.Broadcast(host, 23333, "127.0.0.1", 23334, cancellationTokenSource.Token);
         }
 
         public async void SearchGames()
@@ -54,7 +54,7 @@ namespace AillieoUtils.EasyLAN.Sample
             }
 
             cancellationTokenSource = new CancellationTokenSource();
-            NetGameInfo[] games = await NetWork.Search(23333, cancellationTokenSource.Token);
+            NetGameInfo[] games = await NetGameMaker.Search(23333, cancellationTokenSource.Token);
 
             Debug.Log($"Search: found {games.Length}");
             foreach (var g in games)
