@@ -1,14 +1,13 @@
 using System;
-using System.Linq;
 using System.Text;
 using UnityEngine;
 
 namespace AillieoUtils.EasyLAN
 {
-    public static class SerializeUtils
+    internal static class SerializeUtils
     {
         public static byte[] Serialize<T>(T obj)
-            where T : IInternalObject
+            where T : IProtocol
         {
             try
             {
@@ -23,10 +22,10 @@ namespace AillieoUtils.EasyLAN
                 var headLengthBytes = BitConverter.GetBytes(headLength);
                 var index = 0;
 
-                UnityEngine.Debug.Log("[S] " + head);
-                UnityEngine.Debug.Log("[S] " + headLength);
+                //UnityEngine.Debug.Log("[S] " + head);
+                //UnityEngine.Debug.Log("[S] " + headLength);
                 UnityEngine.Debug.Log("[S] " + json);
-                UnityEngine.Debug.Log("[S] " + length);
+                //UnityEngine.Debug.Log("[S] " + length);
 
                 Array.Copy(lengthBytes, 0, bytes, index, lengthBytes.Length);
                 index += lengthBytes.Length;
@@ -36,7 +35,7 @@ namespace AillieoUtils.EasyLAN
                 index += headBytes.Length;
                 Array.Copy(jsonBytes, 0, bytes, index, jsonBytes.Length);
 
-                UnityEngine.Debug.Log("[S] " + string.Join(",", bytes.Select(b=> b.ToString())));
+                //UnityEngine.Debug.Log("[S] " + string.Join(",", bytes.Select(b=> b.ToString())));
 
                 return bytes;
             }
@@ -47,7 +46,7 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
-        public static bool Deserialize(byte[] bytes, out IInternalObject obj)
+        public static bool Deserialize(byte[] bytes, out IProtocol obj)
         {
             try
             {
@@ -58,9 +57,9 @@ namespace AillieoUtils.EasyLAN
                 //UnityEngine.Debug.Log("[D] " + head);
                 index += headLength;
                 var json = Encoding.UTF8.GetString(bytes, index, bytes.Length - index);
-                //UnityEngine.Debug.Log("[D] " + json);
+                UnityEngine.Debug.Log("[D] " + json);
                 Type type = Type.GetType(head);
-                obj = JsonUtility.FromJson(json, type) as IInternalObject;
+                obj = JsonUtility.FromJson(json, type) as IProtocol;
                 return true;
             }
             catch(Exception e)

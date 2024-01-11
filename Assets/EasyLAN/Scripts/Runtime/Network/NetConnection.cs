@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -11,11 +10,9 @@ namespace AillieoUtils.EasyLAN
     internal class NetConnection : IDisposable
     {
         private TcpClient tcpClient;
-        private StreamReader reader;
-        private StreamWriter writer;
-        private CancellationToken cancellationToken;
+        private NetworkStream stream;
 
-        public event Action<byte[]> onData;
+        public event Action<ByteBuffer> onData;
         public event Action onDisconnected;
 
         private NetConnection()
@@ -35,16 +32,15 @@ namespace AillieoUtils.EasyLAN
             {
                 await rawTcpClient.ConnectAsync(ip, port);
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Debug.LogError($"Failed to connect to {ip}:{port}. Exception: {ex.Message}");
+                Debug.LogException(e);
                 rawTcpClient.Dispose();
                 return null;
             }
 
             NetConnection netConnection = new NetConnection();
-            netConnection.cancellationToken = cancellationToken;
-            netConnection.ConfigTcpClient(rawTcpClient);
+            netConnection.ConfigTcpClient(rawTcpClient, cancellationToken);
 
             return netConnection;
         }
@@ -55,8 +51,7 @@ namespace AillieoUtils.EasyLAN
             {
                 var rawTcpClient = await listener.AcceptTcpClientAsync();
                 NetConnection netConnection = new NetConnection();
-                netConnection.cancellationToken = cancellationToken;
-                netConnection.ConfigTcpClient(rawTcpClient);
+                netConnection.ConfigTcpClient(rawTcpClient, cancellationToken);
                 return netConnection;
             }
             catch (ObjectDisposedException e) when (e.ObjectName == typeof(Socket).FullName)
@@ -73,16 +68,13 @@ namespace AillieoUtils.EasyLAN
             }
         }
          
-        private void ConfigTcpClient(TcpClient rawTcpClient)
+        private void ConfigTcpClient(TcpClient rawTcpClient, CancellationToken cancellationToken)
         {
             if (!cancellationToken.IsCancellationRequested)
             {
                 this.tcpClient = rawTcpClient;
-                var stream = tcpClient.GetStream();
-                this.reader = new StreamReader(stream);
-                this.writer = new StreamWriter(stream);
-                this.writer.AutoFlush = true;
-                this.StartReadingDataAsync().Await();
+                this.stream = tcpClient.GetStream();
+                this.StartReadingDataAsync(cancellationToken).Await();
             }
         }
 
@@ -95,38 +87,56 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
-        public void OnData(string data)
+        private void OnData(byte[] data)
         {
-            UnityEngine.Debug.Log("[RECV]: " + data);
-            onData?.Invoke(Encoding.UTF8.GetBytes(data));
+            UnityEngine.Debug.Log("[RECV]: " + data.ToStringEx());
+            ByteBuffer buffer = new ByteBuffer(data.Length);
+            buffer.Append(data);
+            onData?.Invoke(buffer);
         }
 
-        public void OnDisconnected(string data)
+        private void OnDisconnected(string data)
         {
             UnityEngine.Debug.Log("[CLOSE]: " + data);
             onDisconnected?.Invoke();
         }
 
-        public async Task SendAsync(string data)
+        public async Task SendAsync(ByteBuffer buffer, CancellationToken cancellationToken)
         {
-            UnityEngine.Debug.Log("[SEND]: " + data);
-            await this.writer.WriteLineAsync(data);
+            if (!IsConnected())
+            {
+                throw new ELException();
+            }
+
+            int length = buffer.Length;
+            buffer.Prepend(length);
+            var data = buffer.ToArray();
+            buffer.Clear();
+            await this.stream.WriteAsync(data, 0, data.Length, cancellationToken);
         }
 
-        private async Task StartReadingDataAsync()
+        private async Task StartReadingDataAsync(CancellationToken cancellationToken)
         {
-            while (!this.cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    var data = await this.reader.ReadLineAsync();
-                    if (data == null)
+                    var length = await this.stream.ReadIntAsync(cancellationToken);
+
+                    if (length < 0)
+                    {
+                        break;
+                    }
+
+                    var buffer = new byte[length];
+                    var read = await this.stream.ReadBytesAsync(buffer, length, cancellationToken);
+                    if (read <= 0)
                     {
                         break;
                     }
                     else
                     {
-                        this.OnData(data);
+                        this.OnData(buffer);
                     }
                 }
                 catch (ObjectDisposedException e) when (e.ObjectName == typeof(NetworkStream).FullName)
@@ -145,8 +155,7 @@ namespace AillieoUtils.EasyLAN
 
             this.OnDisconnected("");
 
-            this.writer?.Close();
-            this.reader?.Close();
+            this.stream?.Close();
         }
     }
 }

@@ -1,5 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AillieoUtils.EasyLAN
 {
@@ -8,61 +12,46 @@ namespace AillieoUtils.EasyLAN
         public event Action<NetPlayer> onNewPlayer;
         public event Action<NetPlayer> onPlayerLeave;
         public event Action<NetGameState> onGameStateChanged;
+        public event Action<int, byte[]> onPlayerMessage;
 
         public NetGameState state { get; internal set; } = NetGameState.Uninitiated;
-        public NetGameInfo info { get; private set; }
+        public NetGameInfo info { get; internal set; }
+        public NetPlayer localPlayer { get; internal set; }
 
-        private readonly IdGenerator idGenerator = new IdGenerator();
+        internal readonly IdGenerator idGenerator = new IdGenerator();
+        internal readonly NetHandler netHandler = new NetHandler();
         private readonly Dictionary<int, NetPlayer> allPlayers = new Dictionary<int, NetPlayer>();
 
-        public static NetGameInstance Create(string name, NetPlayer host)
+        internal NetGameInstance()
         {
-            if ((host.flag & NetPlayerFlag.Local) == 0)
-            {
-                throw new InvalidOperationException();
-            }
+            netHandler.game = this;
 
-            if ((host.flag & NetPlayerFlag.Host) != 0)
-            {
-                throw new InvalidOperationException();
-            }
-
-            if ((host.flag & NetPlayerFlag.Remote) != 0)
-            {
-                throw new InvalidOperationException();
-            }
-
-            var game = new NetGameInstance();
-            game.info = new NetGameInfo() { gameName = name };
-
-            host.flag |= NetPlayerFlag.Host;
-            host.id = game.idGenerator.Get();
-
-            return game;
+            netHandler.onData += (p, b) => UnityEngine.Debug.LogError($"收到来自 {p} 的消息 { System.Text.Encoding.UTF8.GetString(b) }");
         }
 
         public void Dispose()
         {
-
+            // TODO
         }
 
-        internal void AddPlayer(NetPlayer player, NetPlayerFlag flag)
+        internal void AddPlayer(NetPlayer player)
         {
-            player.flag |= flag;
-            player.id = this.idGenerator.Get();
             this.allPlayers.Add(player.id, player);
         }
 
         internal void RemovePlayer(NetPlayer player)
         {
-
         }
 
         public IEnumerable<NetPlayer> GetAllPlayers()
         {
-            foreach(var pair in this.allPlayers)
+            foreach (var pair in this.allPlayers)
             {
-                yield return pair.Value;
+                var player = pair.Value;
+                if (player != null && player.IsConnected() && player.state == NetPlayerState.Authenticated)
+                {
+                    yield return player;
+                }
             }
         }
 
@@ -75,6 +64,90 @@ namespace AillieoUtils.EasyLAN
 
             this.state = newState;
             this.onGameStateChanged?.Invoke(newState);
+        }
+
+        public async Task Start()
+        {
+            if (!localPlayer.IsHost())
+            {
+                throw new InvalidOperationException();
+            }
+
+            this.ChangeState(NetGameState.GamePlaying);
+        }
+
+        public bool IsListening()
+        {
+            return this.state == NetGameState.Listening;
+        }
+
+        public void StartAcceptPlayer(ref NetGameInfo info, CancellationToken cancellationToken)
+        {
+            TcpListener listener = new TcpListener(IPAddress.Any, 0);
+            listener.Start();
+
+            if (string.IsNullOrEmpty(info.ip))
+            {
+                info.ip = LANUtils.GetLocalIpAddress().ToString();
+            }
+
+            if (listener.LocalEndpoint is IPEndPoint iep)
+            {
+                info.port = iep.Port;
+            }
+
+            AcceptPlayerAsync(listener, cancellationToken).Await();
+        }
+
+        private async Task AcceptPlayerAsync(TcpListener listener, CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var connection = await NetConnection.AcceptAsync(listener, cancellationToken);
+                var player = await NetPlayer.AcceptRemote(connection, this, cancellationToken);
+                if (player != null)
+                {
+                    // 我是主机 我接受了一个远端的连接
+                    this.netHandler.RegisterPlayer(player, connection);
+                    this.AddPlayer(player);
+                }
+            }
+
+            listener.Stop();
+        }
+
+        public NetPlayer GetPlayer(int playerId)
+        {
+            if (this.allPlayers.TryGetValue(playerId, out NetPlayer player))
+            {
+                return player;
+            }
+
+            return null;
+        }
+
+        public void Send(int playerId, byte[] data)
+        {
+            Send(playerId, data, CancellationToken.None);
+        }
+
+        public void Broadcast(byte[] data)
+        {
+            Broadcast(data, CancellationToken.None);
+        }
+
+        public void Send(int target, byte[] data, CancellationToken cancellationToken)
+        {
+            ByteBuffer buffer = new ByteBuffer(data.Length);
+            buffer.Append(data);
+            this.netHandler.SendAsync(target, buffer, cancellationToken).Await();
+        }
+
+        public void Broadcast(byte[] data, CancellationToken cancellationToken)
+        {
+            ByteBuffer buffer = new ByteBuffer(data.Length);
+            buffer.Append(data);
+            this.netHandler.BroadcastAsync(buffer, cancellationToken).Await();
         }
     }
 }

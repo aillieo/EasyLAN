@@ -1,12 +1,12 @@
+using System;
+using UnityEngine;
+
 namespace AillieoUtils.EasyLAN
 {
-    using System;
-    using UnityEngine;
-
     [Serializable]
-    public struct NetPlayerInfo : IInternalObject
+    public struct NetPlayerInfo : IProtocol
     {
-        [field:SerializeField]
+        [field: SerializeField]
         public string playerName { get; set; }
     }
 }

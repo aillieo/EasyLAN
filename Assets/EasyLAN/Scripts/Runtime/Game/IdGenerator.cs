@@ -2,7 +2,7 @@ using System.Threading;
 
 namespace AillieoUtils.EasyLAN
 {
-    public class IdGenerator
+    internal class IdGenerator
     {
         private int sid;
 

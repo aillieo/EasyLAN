@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace AillieoUtils.EasyLAN
 {
-    public static class LANUtils
+    internal static class LANUtils
     {
         public delegate bool Matcher(byte[] rawBytes);
         public delegate bool Parser<T>(byte[] rawBytes, out T obj);
@@ -32,28 +33,27 @@ namespace AillieoUtils.EasyLAN
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    Task complete = await Task.WhenAny(
-                        udpClient.ReceiveAsync(),
-                        Task.Delay(1000));
-
-                    if (complete is Task<UdpReceiveResult> receive)
+                    var receive = udpClient.ReceiveAsync();
+                    try
                     {
-                        UdpReceiveResult udpResult = await receive;
-
-                        // 客户端收到了服务器的回应
-                        if (parser(udpResult.Buffer, out T remote))
-                        {
-                            if (result == null)
-                            {
-                                result = new List<T>();
-                            }
-
-                            result.Add(remote);
-                        }
+                        await receive.SetTimeout(1000);
                     }
-                    else
+                    catch (TimeoutException)
                     {
                         break;
+                    }
+
+                    UdpReceiveResult udpResult = await receive;
+
+                    // 客户端收到了服务器的回应
+                    if (parser(udpResult.Buffer, out T remote))
+                    {
+                        if (result == null)
+                        {
+                            result = new List<T>();
+                        }
+
+                        result.Add(remote);
                     }
                 }
 
@@ -86,6 +86,61 @@ namespace AillieoUtils.EasyLAN
                     await Task.Delay(100);
                 }
             }
+        }
+
+        public static IPAddress GetLocalIpAddress()
+        {
+            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+            foreach (NetworkInterface iface in interfaces)
+            {
+                if (iface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || iface.NetworkInterfaceType == NetworkInterfaceType.Ethernet)
+                {
+                    IPInterfaceProperties ipProperties = iface.GetIPProperties();
+                    foreach (UnicastIPAddressInformation ipInfo in ipProperties.UnicastAddresses)
+                    {
+                        if (ipInfo.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            IPAddress localIpAddress = ipInfo.Address;
+
+                            if(IsPrivateIp(localIpAddress))
+                            {
+                                return localIpAddress;
+                            }
+                        }
+                    }
+                }
+            }
+
+            throw new NotSupportedException();
+        }
+
+        private static bool IsPrivateIp(IPAddress ipAddress)
+        {
+            byte[] addressBytes = ipAddress.GetAddressBytes();
+
+            if (addressBytes.Length == 4)
+            {
+                // 10.0.0.0 - 10.255.255.255
+                if (addressBytes[0] == 10)
+                {
+                    return true;
+                }
+
+                // 172.16.0.0 - 172.31.255.255
+                if (addressBytes[0] == 172 && addressBytes[1] >= 16 && addressBytes[1] <= 31)
+                {
+                    return true;
+                }
+
+                // 192.168.0.0 - 192.168.255.255
+                if (addressBytes[0] == 192 && addressBytes[1] == 168)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

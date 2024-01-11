@@ -41,7 +41,16 @@ namespace AillieoUtils.EasyLAN.Sample
                 host = "host";
             }
 
-            await NetGameMaker.Broadcast(host, 23333, "127.0.0.1", 23334, cancellationTokenSource.Token);
+            NetGameMaker.Create(
+                new NetGameInfo()
+                {
+                    gameName = nameof(Sample),
+                },
+                new NetPlayerInfo()
+                {
+                    playerName = host,
+                },
+                cancellationTokenSource.Token);
         }
 
         public async void SearchGames()

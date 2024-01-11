@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -7,12 +5,7 @@ namespace AillieoUtils.EasyLAN
 {
     public static class NetGameMaker
     {
-        public static async Task Broadcast(string hostName, int udpPort, string ip, int tcpPort, CancellationToken cancellationToken)
-        {
-            NetGameInfo netGameInfo = new NetGameInfo() { gameName = hostName, ip = ip, port = tcpPort };
-            byte[] bytes = SerializeUtils.Serialize(netGameInfo);
-            await LANUtils.Listen(udpPort, NetGameInfo.ValidateHead, bytes, cancellationToken);
-        }
+        public static int broadcastPort = 23333;
 
         public static async Task<NetGameInfo[]> Search(int port, CancellationToken cancellationToken)
         {
@@ -20,29 +13,39 @@ namespace AillieoUtils.EasyLAN
             return await LANUtils.Search<NetGameInfo>(port, bytes, NetGameInfo.Deserialize, cancellationToken);
         }
 
-        public static async Task AcceptPlayerAsync(NetGameInstance gameInstance, int port, CancellationToken cancellationToken)
+        public static NetGameInstance Create(NetGameInfo gameInfo, NetPlayerInfo playerInfo, CancellationToken cancellationToken)
         {
-            TcpListener listener = new TcpListener(IPAddress.Any, port);
-            listener.Start();
+            var game = new NetGameInstance();
 
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var connection = await NetConnection.AcceptAsync(listener, cancellationToken);
-                var player = NetPlayer.CreateLocal(new NetPlayerInfo());
-                if(await NetPlayer.CreateRemote(player, connection))
-                {
-                    gameInstance.AddPlayer(player, NetPlayerFlag.Remote);
-                }
-            }
+            NetPlayer host = NetPlayer.CreateLocal(playerInfo);
+            host.flag |= NetPlayerFlag.Host;
+            host.id = game.idGenerator.Get();
 
-            listener.Stop();
+            game.localPlayer = host;
+
+            game.StartAcceptPlayer(ref gameInfo, cancellationToken);
+            game.info = gameInfo;
+
+            byte[] bytes = SerializeUtils.Serialize(gameInfo);
+            LANUtils.Listen(broadcastPort, NetGameInfo.ValidateHead, bytes, cancellationToken).Await();
+
+            return game;
         }
 
-        public static async Task<bool> JoinRemote(NetPlayer player, NetGameInfo gameInfo, CancellationToken cancellationToken)
+        public static async Task<NetGameInstance> Join(NetPlayerInfo info, NetGameInfo gameInfo, CancellationToken cancellationToken)
         {
+            var game = new NetGameInstance();
+            game.info = gameInfo;
+
             NetConnection connection = await NetConnection.ConnectAsync(gameInfo.ip, gameInfo.port, cancellationToken);
-            await NetPlayer.CreateRemote(player, connection);
-            return true;
+            var player = await NetPlayer.JoinRemote(connection, info, cancellationToken);
+
+            game.localPlayer = player;
+
+            // 对方是主机 我加入了对方
+            game.netHandler.RegisterPlayer(player, connection);
+
+            return game;
         }
     }
 }

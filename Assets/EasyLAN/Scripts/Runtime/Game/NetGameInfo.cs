@@ -5,7 +5,7 @@ using UnityEngine;
 namespace AillieoUtils.EasyLAN
 {
     [Serializable]
-    public struct NetGameInfo : IInternalObject
+    public struct NetGameInfo : IProtocol
     {
         public string gameName;
         public string playerName;
@@ -61,7 +61,7 @@ namespace AillieoUtils.EasyLAN
         public static bool Deserialize(byte[] buffer, out NetGameInfo netGameInfo)
         {
             {
-                var succeed = SerializeUtils.Deserialize(buffer, out IInternalObject o);
+                var succeed = SerializeUtils.Deserialize(buffer, out IProtocol o);
                 if (succeed)
                 {
                     netGameInfo = (NetGameInfo)o;

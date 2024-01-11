@@ -1,6 +1,7 @@
 namespace AillieoUtils.EasyLAN
 {
-    public interface IInternalObject
+    public interface IProtocol
     {
+        
     }
 }
