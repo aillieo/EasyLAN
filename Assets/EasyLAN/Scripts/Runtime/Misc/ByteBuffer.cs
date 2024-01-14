@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace AillieoUtils.EasyLAN
 {
@@ -9,17 +10,25 @@ namespace AillieoUtils.EasyLAN
         private int end;
 
         private int capacity;
-        private readonly ByteArrayPool pool = new ByteArrayPool(32);
 
         public int Length { get; private set; }
 
         public ByteBuffer(int capacity)
         {
-            buffer = pool.Get(capacity);
+            buffer = ByteArrayPool.shared.Get(capacity);
             this.capacity = buffer.Length;
             start = 0;
             end = 0;
             Length = 0;
+        }
+
+        public ByteBuffer(byte[] data, int length)
+        {
+            buffer = data;
+            this.capacity = length;
+            start = 0;
+            end = length;
+            Length = length;
         }
 
         public void Append(byte[] data)
@@ -145,44 +154,22 @@ namespace AillieoUtils.EasyLAN
 
         public byte[] ToArray()
         {
-            byte[] data = new byte[Length];
+            byte[] byteArray = new byte[Length];
             if (Length > 0)
             {
                 if (start < end)
                 {
-                    Array.Copy(buffer, start, data, 0, Length);
+                    Array.Copy(buffer, start, byteArray, 0, Length);
                 }
                 else
                 {
                     int remainingData = capacity - start;
-                    Array.Copy(buffer, start, data, 0, remainingData);
-                    Array.Copy(buffer, 0, data, remainingData, Length - remainingData);
+                    Array.Copy(buffer, start, byteArray, 0, remainingData);
+                    Array.Copy(buffer, 0, byteArray, remainingData, Length - remainingData);
                 }
-            }
-            return data;
-        }
-
-        public int CopyTo(byte[] byteArray, int index)
-        {
-            if (byteArray.Length - start < Length)
-            {
-                throw new ELException();
             }
 
-            if (Length > 0)
-            {
-                if (start < end)
-                {
-                    Array.Copy(buffer, start, byteArray, index, Length);
-                }
-                else
-                {
-                    int remainingData = capacity - start;
-                    Array.Copy(buffer, start, byteArray, index, remainingData);
-                    Array.Copy(buffer, 0, byteArray, index + remainingData, Length - remainingData);
-                }
-            }
-            return Length;
+            return byteArray;
         }
 
         private void EnsureCapacity(int requiredCapacity)
@@ -190,7 +177,7 @@ namespace AillieoUtils.EasyLAN
             if (requiredCapacity > capacity - Length)
             {
                 int newCapacity = Math.Max(capacity * 2, capacity + requiredCapacity);
-                byte[] newBuffer = pool.Get(newCapacity);
+                byte[] newBuffer = ByteArrayPool.shared.Get(newCapacity);
                 newCapacity = newBuffer.Length;
 
                 if (Length > 0)
@@ -212,7 +199,7 @@ namespace AillieoUtils.EasyLAN
 
                 if (buffer.Length > 0)
                 {
-                    pool.Recycle(oldBuffer);
+                    ByteArrayPool.shared.Recycle(oldBuffer);
                 }
 
                 capacity = newCapacity;
@@ -268,22 +255,32 @@ namespace AillieoUtils.EasyLAN
                 throw new InvalidOperationException();
             }
 
-            byte[] data = new byte[count];
+            byte[] result = new byte[count];
+            this.Consume(count, result, 0);
+            return result;
+        }
+
+        public void Consume(int count, byte[] destinationArray, int destinationIndex)
+        {
+            if (count > Length)
+            {
+                throw new InvalidOperationException();
+            }
+
             if (start + count <= capacity)
             {
-                Array.Copy(buffer, start, data, 0, count);
+                Array.Copy(buffer, start, destinationArray, 0, count);
                 start += count;
             }
             else
             {
                 int remainingData = capacity - start;
-                Array.Copy(buffer, start, data, 0, remainingData);
-                Array.Copy(buffer, 0, data, remainingData, count - remainingData);
+                Array.Copy(buffer, start, destinationArray, destinationIndex, remainingData);
+                Array.Copy(buffer, 0, destinationArray, destinationIndex + remainingData, count - remainingData);
                 start = count - remainingData;
             }
 
             Length -= count;
-            return data;
         }
 
         public byte ConsumeByte()
@@ -340,6 +337,39 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
+        public void Append(string data)
+        {
+            int byteCount = Encoding.UTF8.GetByteCount(data);
+            byte[] byteArray = ByteArrayPool.shared.Get(byteCount);
+
+            try
+            {
+                Encoding.UTF8.GetBytes(data, 0, data.Length, byteArray, 0);
+                this.Append(byteCount);
+                this.Append(byteArray);
+            }
+            finally
+            {
+                ByteArrayPool.shared.Recycle(byteArray);
+            }
+        }
+
+        public string ConsumeString()
+        {
+            int byteCount = this.ConsumeInt();
+            byte[] byteArray = ByteArrayPool.shared.Get(byteCount);
+
+            try
+            {
+                this.Consume(byteCount, byteArray, 0);
+                return Encoding.UTF8.GetString(byteArray, 0, byteCount);
+            }
+            finally
+            {
+                ByteArrayPool.shared.Recycle(byteArray);
+            }
+        }
+
         public void Clear()
         {
             start = 0;
@@ -348,7 +378,7 @@ namespace AillieoUtils.EasyLAN
 
             if (buffer.Length > 0)
             {
-                pool.Recycle(buffer);
+                ByteArrayPool.shared.Recycle(buffer);
             }
 
             buffer = Array.Empty<byte>();

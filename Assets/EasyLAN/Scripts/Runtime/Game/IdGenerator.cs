@@ -2,25 +2,58 @@ using System.Threading;
 
 namespace AillieoUtils.EasyLAN
 {
+    using System.Threading;
+
     internal class IdGenerator
     {
-        private int sid;
+        private int[] bitmap;
 
-        public int Get()
+        public IdGenerator()
         {
-            do
+            bitmap = new int[4];
+        }
+
+        public byte Get()
+        {
+            while (true)
             {
-                int cur = sid;
-                int newId = cur + 1;
-
-                int exchangedId = Interlocked.CompareExchange(ref sid, newId, cur);
-
-                if (exchangedId == cur)
+                for (int i = 0; i < bitmap.Length; i++)
                 {
-                    return newId;
+                    int originalValue = Volatile.Read(ref bitmap[i]);
+                    for (int j = 0; j < 32; j++)
+                    {
+                        int mask = 1 << j;
+                        if ((originalValue & mask) == 0)
+                        {
+                            int newValue = originalValue | mask;
+                            int result = Interlocked.CompareExchange(ref bitmap[i], newValue, originalValue);
+                            if (result == originalValue)
+                            {
+                                return (byte)((i * 32) + j);
+                            }
+                            break;
+                        }
+                    }
                 }
+            }
+        }
 
-            } while (true);
+        public void Release(byte id)
+        {
+            int index = id / 32;
+            int bitOffset = id % 32;
+            int mask = 1 << bitOffset;
+
+            while (true)
+            {
+                int originalValue = Volatile.Read(ref bitmap[index]);
+                int newValue = originalValue & ~mask;
+                int result = Interlocked.CompareExchange(ref bitmap[index], newValue, originalValue);
+                if (result == originalValue)
+                {
+                    break;
+                }
+            }
         }
     }
 }

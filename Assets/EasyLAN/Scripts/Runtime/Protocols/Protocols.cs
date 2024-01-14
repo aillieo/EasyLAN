@@ -67,7 +67,7 @@ namespace AillieoUtils.EasyLAN
 
     [Serializable]
     public struct SyncNetGameState : IProtocol
-    { 
- 
+    {
+        public NetGameState state;
     }
 }

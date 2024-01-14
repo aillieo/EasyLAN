@@ -67,7 +67,7 @@ namespace AillieoUtils.EasyLAN
                 return null;
             }
         }
-         
+
         private void ConfigTcpClient(TcpClient rawTcpClient, CancellationToken cancellationToken)
         {
             if (!cancellationToken.IsCancellationRequested)
@@ -87,11 +87,9 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
-        private void OnData(byte[] data)
+        private void OnData(ByteBuffer buffer)
         {
-            UnityEngine.Debug.Log("[RECV]: " + data.ToStringEx());
-            ByteBuffer buffer = new ByteBuffer(data.Length);
-            buffer.Append(data);
+            UnityEngine.Debug.Log("[RECV]: " + buffer.ToArray().ToStringEx());
             onData?.Invoke(buffer);
         }
 
@@ -128,14 +126,15 @@ namespace AillieoUtils.EasyLAN
                         break;
                     }
 
-                    var buffer = new byte[length];
-                    var read = await this.stream.ReadBytesAsync(buffer, length, cancellationToken);
+                    var bytes = ByteArrayPool.shared.Get(length);
+                    var read = await this.stream.ReadBytesAsync(bytes, length, cancellationToken);
                     if (read <= 0)
                     {
                         break;
                     }
                     else
                     {
+                        ByteBuffer buffer = new ByteBuffer(bytes, length);
                         this.OnData(buffer);
                     }
                 }

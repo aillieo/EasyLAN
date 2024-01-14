@@ -5,6 +5,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace AillieoUtils.EasyLAN
 {
@@ -13,9 +14,18 @@ namespace AillieoUtils.EasyLAN
         public delegate bool Matcher(byte[] rawBytes);
         public delegate bool Parser<T>(byte[] rawBytes, out T obj);
 
+        public static bool IsNetworkAvailable()
+        {
+            if (!NetworkInterface.GetIsNetworkAvailable())
+            {
+                return false;
+            }
+
+            return Application.internetReachability != NetworkReachability.NotReachable;
+        }
+
         public static async Task<T[]> Search<T>(int portToSend, byte[] pattern, Parser<T> parser, CancellationToken cancellationToken)
         {
-            // todo 返回一个NetWork实例 可以反复使用socket
             using (UdpClient udpClient = new UdpClient())
             {
                 udpClient.EnableBroadcast = true;
