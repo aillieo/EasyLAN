@@ -3,7 +3,7 @@ using System.Text;
 
 namespace AillieoUtils.EasyLAN
 {
-    internal class ByteBuffer : IDisposable
+    internal partial class ByteBuffer : IDisposable
     {
         private byte[] buffer;
         private int start;
@@ -12,6 +12,13 @@ namespace AillieoUtils.EasyLAN
         private int capacity;
 
         public int Length { get; private set; }
+
+        private static readonly bool isLittleEndian;
+
+        static ByteBuffer()
+        {
+            isLittleEndian = BitConverter.IsLittleEndian;
+        }
 
         public ByteBuffer(int capacity)
         {
@@ -25,35 +32,89 @@ namespace AillieoUtils.EasyLAN
         public ByteBuffer(byte[] data, int length)
         {
             buffer = data;
-            this.capacity = length;
+            this.capacity = buffer.Length;
             start = 0;
             end = length;
             Length = length;
         }
 
-        public void Append(byte[] data)
+        public ByteBuffer Copy()
+        {
+            ByteBuffer copy = new ByteBuffer(this.Length);
+            if (Length > 0)
+            {
+                if (start < end)
+                {
+                    Array.Copy(buffer, start, copy.buffer, 0, Length);
+                }
+                else
+                {
+                    int remainingData = capacity - start;
+                    Array.Copy(buffer, start, copy.buffer, 0, remainingData);
+                    Array.Copy(buffer, 0, copy.buffer, remainingData, Length - remainingData);
+                }
+            }
+
+            copy.Length = this.Length;
+            copy.start = 0;
+            copy.end = copy.start + copy.Length;
+            copy.capacity = copy.buffer.Length;
+            return copy;
+        }
+
+        public void Append(byte[] data, int index, int count)
         {
             if (data == null)
             {
                 throw new ArgumentNullException(nameof(data));
             }
 
-            EnsureCapacity(data.Length);
+            EnsureCapacity(count);
 
-            if (end + data.Length <= capacity)
+            if (end + count <= capacity)
             {
-                Array.Copy(data, 0, buffer, end, data.Length);
-                end += data.Length;
+                Array.Copy(data, index, buffer, end, count);
+                end += count;
             }
             else
             {
                 int remainingSpace = capacity - end;
-                Array.Copy(data, 0, buffer, end, remainingSpace);
-                Array.Copy(data, remainingSpace, buffer, 0, data.Length - remainingSpace);
-                end = data.Length - remainingSpace;
+                Array.Copy(data, index, buffer, end, remainingSpace);
+                Array.Copy(data, index + remainingSpace, buffer, 0, count - remainingSpace);
+                end = count - remainingSpace;
             }
 
-            Length += data.Length;
+            Length += count;
+        }
+
+        public void Append(byte[] data)
+        {
+            this.Append(data, 0, data.Length);
+        }
+
+        public void Prepend(byte[] data, int index, int count)
+        {
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+
+            EnsureCapacity(count);
+
+            if (start - count >= 0)
+            {
+                start -= count;
+                Array.Copy(data, index, buffer, start, count);
+            }
+            else
+            {
+                int remainingSpace = start;
+                start = capacity - (count - remainingSpace);
+                Array.Copy(data, index, buffer, start, remainingSpace);
+                Array.Copy(data, index + remainingSpace, buffer, 0, count - remainingSpace);
+            }
+
+            Length += count;
         }
 
         public void Prepend(byte[] data)
@@ -63,22 +124,7 @@ namespace AillieoUtils.EasyLAN
                 throw new ArgumentNullException(nameof(data));
             }
 
-            EnsureCapacity(data.Length);
-
-            if (start - data.Length >= 0)
-            {
-                start -= data.Length;
-                Array.Copy(data, 0, buffer, start, data.Length);
-            }
-            else
-            {
-                int remainingSpace = start;
-                start = capacity - (data.Length - remainingSpace);
-                Array.Copy(data, 0, buffer, start, remainingSpace);
-                Array.Copy(data, remainingSpace, buffer, 0, data.Length - remainingSpace);
-            }
-
-            Length += data.Length;
+            Prepend(data, 0, data.Length);
         }
 
         public void Append(short data)
@@ -120,7 +166,6 @@ namespace AillieoUtils.EasyLAN
 
             Length += 4;
         }
-
 
         public void Prepend(char data)
         {
@@ -210,7 +255,7 @@ namespace AillieoUtils.EasyLAN
 
         private void WriteShort(int startIndex, short data)
         {
-            if (BitConverter.IsLittleEndian)
+            if (isLittleEndian)
             {
                 buffer[startIndex] = (byte)(data & 0xFF);
                 startIndex = (startIndex + 1) % capacity;
@@ -226,7 +271,7 @@ namespace AillieoUtils.EasyLAN
 
         private void WriteInt(int startIndex, int data)
         {
-            if (BitConverter.IsLittleEndian)
+            if (isLittleEndian)
             {
                 buffer[startIndex] = (byte)(data & 0xFF);
                 startIndex = (startIndex + 1) % capacity;
@@ -269,7 +314,7 @@ namespace AillieoUtils.EasyLAN
 
             if (start + count <= capacity)
             {
-                Array.Copy(buffer, start, destinationArray, 0, count);
+                Array.Copy(buffer, start, destinationArray, destinationIndex, count);
                 start += count;
             }
             else
@@ -313,7 +358,7 @@ namespace AillieoUtils.EasyLAN
 
         private int ReadInt(int startIndex)
         {
-            if (BitConverter.IsLittleEndian)
+            if (isLittleEndian)
             {
                 int value = buffer[startIndex];
                 startIndex = (startIndex + 1) % capacity;
@@ -346,7 +391,7 @@ namespace AillieoUtils.EasyLAN
             {
                 Encoding.UTF8.GetBytes(data, 0, data.Length, byteArray, 0);
                 this.Append(byteCount);
-                this.Append(byteArray);
+                this.Append(byteArray, 0, byteCount);
             }
             finally
             {

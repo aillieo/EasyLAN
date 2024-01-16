@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 namespace AillieoUtils.EasyLAN
@@ -6,7 +7,7 @@ namespace AillieoUtils.EasyLAN
     {
         public static string ToStringEx(this byte[] bytes)
         {
-            return string.Join("-", bytes.Select(b => b.ToString()));
+            return string.Join("-", bytes.Select(b => $"{b:X2}"));
         }
     }
 }

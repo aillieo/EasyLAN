@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -18,9 +19,9 @@ namespace AillieoUtils.EasyLAN
         public NetGameInfo info { get; internal set; }
         public NetPlayer localPlayer { get; internal set; }
 
-        internal readonly IdGenerator idGenerator = new IdGenerator();
+        internal readonly IdGeneratorReusable idGenerator = new IdGeneratorReusable();
         internal readonly NetHandler netHandler = new NetHandler();
-        private readonly Dictionary<int, NetPlayer> allPlayers = new Dictionary<int, NetPlayer>();
+        private readonly Dictionary<byte, NetPlayer> allPlayers = new Dictionary<byte, NetPlayer>();
 
         internal NetGameInstance()
         {
@@ -66,12 +67,17 @@ namespace AillieoUtils.EasyLAN
             this.onGameStateChanged?.Invoke(newState);
         }
 
-        public async Task Start()
+        public void Start()
         {
             if (!localPlayer.IsHost())
             {
                 throw new InvalidOperationException();
             }
+
+            //if (this.state != NetGameState.Ready)
+            //{
+            //    throw new InvalidOperationException();
+            //}
 
             this.ChangeState(NetGameState.GamePlaying);
         }
@@ -116,7 +122,7 @@ namespace AillieoUtils.EasyLAN
             listener.Stop();
         }
 
-        public NetPlayer GetPlayer(int playerId)
+        public NetPlayer GetPlayer(byte playerId)
         {
             if (this.allPlayers.TryGetValue(playerId, out NetPlayer player))
             {
@@ -126,7 +132,7 @@ namespace AillieoUtils.EasyLAN
             return null;
         }
 
-        public void Send(int playerId, byte[] data)
+        public void Send(byte playerId, byte[] data)
         {
             Send(playerId, data, CancellationToken.None);
         }
@@ -136,7 +142,7 @@ namespace AillieoUtils.EasyLAN
             Broadcast(data, CancellationToken.None);
         }
 
-        public void Send(int target, byte[] data, CancellationToken cancellationToken)
+        public void Send(byte target, byte[] data, CancellationToken cancellationToken)
         {
             ByteBuffer buffer = new ByteBuffer(data.Length);
             buffer.Append(data);

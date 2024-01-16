@@ -8,12 +8,12 @@ namespace AillieoUtils.EasyLAN
     internal class NetHandler
     {
         public NetGameInstance game;
-        public event Action<int, byte[]> onData;
-        private readonly Dictionary<int, Action<ByteBuffer>> handlers = new Dictionary<int, Action<ByteBuffer>>();
+        public event Action<byte, byte[]> onData;
+        private readonly Dictionary<byte, Action<ByteBuffer>> handlers = new Dictionary<byte, Action<ByteBuffer>>();
 
-        public async Task SendAsync(int target, ByteBuffer buffer, CancellationToken cancellationToken)
+        public async Task SendAsync(byte target, ByteBuffer buffer, CancellationToken cancellationToken)
         {
-            int localPlayerId = game.localPlayer.id;
+            byte localPlayerId = game.localPlayer.id;
             bool isHost = game.localPlayer.IsHost();
 
             var bytes = buffer.ToArray();
@@ -28,8 +28,8 @@ namespace AillieoUtils.EasyLAN
             {
                 // host发给非host的普通玩家
                 var player = game.GetPlayer(target);
-                buffer.Prepend(localPlayerId);
                 buffer.Prepend(ChannelFlag.Direct);
+                buffer.Prepend(localPlayerId);
                 await player.connection.SendAsync(buffer, cancellationToken);
             }
             else
@@ -45,7 +45,7 @@ namespace AillieoUtils.EasyLAN
 
         public async Task BroadcastAsync(ByteBuffer buffer, CancellationToken cancellationToken)
         {
-            int localPlayerId = game.localPlayer.id;
+            byte localPlayerId = game.localPlayer.id;
             bool isHost = game.localPlayer.IsHost();
 
             // 先发自己
@@ -55,13 +55,14 @@ namespace AillieoUtils.EasyLAN
             if (isHost)
             {
                 // host发给非host的普通玩家
-                buffer.Prepend(localPlayerId);
                 buffer.Prepend(ChannelFlag.Direct);
+                buffer.Prepend(localPlayerId);
                 foreach (var player in game.GetAllPlayers())
                 {
                     if (player.id != localPlayerId)
                     {
-                        await player.connection.SendAsync(buffer, cancellationToken);
+                        var copy = buffer.Copy();
+                        await player.connection.SendAsync(copy, cancellationToken);
                     }
                 }
             }
@@ -77,7 +78,7 @@ namespace AillieoUtils.EasyLAN
         internal void RegisterPlayer(NetPlayer player, NetConnection netConnection)
         {
             Action<ByteBuffer> handler;
-            int playerId = player.id;
+            byte playerId = player.id;
 
             if (this.game.localPlayer.IsHost())
             {
@@ -94,33 +95,74 @@ namespace AillieoUtils.EasyLAN
             this.handlers.Add(playerId, handler);
         }
         
-        internal void UnregisterPlayer(int playerId)
+        internal void UnregisterPlayer(byte playerId)
         {
 
         }
 
         private void OnData(ByteBuffer buffer)
         {
-            var sender = buffer.ConsumeInt();
+            var sender = buffer.ConsumeByte();
             this.OnData(sender, buffer);
             buffer.Clear();
         }
 
-        private void OnData(int sender, ByteBuffer buffer)
+        private void OnData(byte sender, ByteBuffer buffer)
         {
+            int localPlayerId = game.localPlayer.id;
+            bool isHost = game.localPlayer.IsHost();
+
             var channel = buffer.ConsumeByte();
+
             switch (channel)
             {
                 case ChannelFlag.Direct:
+                    UnityEngine.Debug.Log($"[R][Direct {ChannelFlag.Direct}]" + buffer.ToArray().ToStringEx());
                     this.onData?.Invoke(sender, buffer.ToArray());
                     buffer.Clear();
                     break;
                 case ChannelFlag.Broadcast:
-                    this.BroadcastAsync(buffer, CancellationToken.None).Await();
+                    UnityEngine.Debug.Log($"[R][Broadcast {ChannelFlag.Broadcast}]" + buffer.ToArray().ToStringEx());
+
+                    if (!isHost)
+                    {
+                        throw new ELException();
+                    }
+
+                    this.onData?.Invoke(sender, buffer.ToArray());
+
+                    // host发给非host的普通玩家
+                    buffer.Prepend(ChannelFlag.Direct);
+                    buffer.Prepend(sender);
+                    foreach (var player in game.GetAllPlayers())
+                    {
+                        if (player.id != localPlayerId && player.id != sender)
+                        {
+                            var copy = buffer.Copy();
+                            player.connection.SendAsync(copy).Await();
+                        }
+                    }
+
                     break;
                 case ChannelFlag.Forward:
-                    int target = buffer.ConsumeInt();
-                    this.SendAsync(target, buffer, CancellationToken.None).Await();
+                    UnityEngine.Debug.Log($"[R][Forward {ChannelFlag.Forward}]" + buffer.ToArray().ToStringEx());
+
+                    byte target = buffer.ConsumeByte();
+                    if (localPlayerId == target)
+                    {
+                        byte realSender = buffer.ConsumeByte();
+                        this.onData?.Invoke(realSender, buffer.ToArray());
+                        buffer.Clear();
+                    }
+                    else
+                    {
+                        if (!isHost)
+                        {
+                            throw new ELException();
+                        }
+
+                        this.SendAsync(target, buffer, CancellationToken.None).Await();
+                    }
                     break;
                 default:
                     throw new ELException();

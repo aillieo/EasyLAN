@@ -62,12 +62,25 @@ namespace AillieoUtils.EasyLAN
     [Serializable]
     public struct InstanceId : IProtocol
     {
-        public int value;
+        public byte value;
     }
 
     [Serializable]
     public struct SyncNetGameState : IProtocol
     {
         public NetGameState state;
+    }
+
+    [Serializable]
+    public struct SyncPlayers : IProtocol
+    {
+        [Serializable]
+        public struct PlayerInfoWithId
+        {
+            public byte id;
+            public NetPlayerInfo info;
+        }
+
+        public List<PlayerInfoWithId> players;
     }
 }

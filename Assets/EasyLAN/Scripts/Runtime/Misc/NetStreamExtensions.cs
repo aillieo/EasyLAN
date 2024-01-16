@@ -7,37 +7,47 @@ namespace AillieoUtils.EasyLAN
 {
     internal static class NetStreamExtensions
     {
+        internal static async Task<int> ReadAsync(this NetworkStream stream, ByteBuffer buffer, int count, CancellationToken cancellationToken)
+        {
+            return await buffer.ReadFromStreamAsync(stream, count, cancellationToken);
+        }
+
+        internal static async Task WriteAsync(this NetworkStream stream, ByteBuffer buffer, CancellationToken cancellationToken)
+        {
+            await buffer.WriteToStreamAsync(stream, cancellationToken);
+        }
+
         internal static async Task<int> ReadIntAsync(this NetworkStream stream, CancellationToken cancellationToken)
         {
-            byte[] intBuffer = new byte[4];
-            int bytesRead = await stream.ReadAsync(intBuffer, 0, 4, cancellationToken);
+            ByteBuffer buffer = new ByteBuffer(4);
+            int bytesRead = await stream.ReadAsync(buffer, 4, cancellationToken);
             if (bytesRead != 4)
             {
                 return -1;
             }
 
-            int length = BitConverter.ToInt32(intBuffer, 0);
-            return length;
+            int lengthValue = buffer.ConsumeInt();
+            return lengthValue;
         }
 
-        internal static async Task<int> ReadBytesAsync(this NetworkStream stream, byte[] buffer, int length, CancellationToken cancellationToken)
+        internal static async Task<ByteBuffer> ReadBytesAsync(this NetworkStream stream, int length, CancellationToken cancellationToken)
         {
             int totalBytesRead = 0;
-            length = Math.Min(length, buffer.Length);
+            ByteBuffer buffer = new ByteBuffer(length);
 
             while (totalBytesRead < length)
             {
-                int bytesRead = await stream.ReadAsync(buffer, totalBytesRead, length - totalBytesRead, cancellationToken);
+                int bytesRead = await stream.ReadAsync(buffer, length - totalBytesRead, cancellationToken);
 
                 if (bytesRead == 0)
                 {
-                    return -1;
+                    return null;
                 }
 
                 totalBytesRead += bytesRead;
             }
 
-            return length;
+            return buffer;
         }
     }
 }

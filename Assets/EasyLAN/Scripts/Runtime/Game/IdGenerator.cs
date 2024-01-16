@@ -1,59 +1,27 @@
+using System;
 using System.Threading;
 
 namespace AillieoUtils.EasyLAN
 {
-    using System.Threading;
-
     internal class IdGenerator
     {
-        private int[] bitmap;
+        private int sid = 0;
+        private readonly int mask;
 
         public IdGenerator()
+            : this((int)DateTime.Now.Ticks & 0X7fff)
         {
-            bitmap = new int[4];
         }
 
-        public byte Get()
+        public IdGenerator(int mask)
         {
-            while (true)
-            {
-                for (int i = 0; i < bitmap.Length; i++)
-                {
-                    int originalValue = Volatile.Read(ref bitmap[i]);
-                    for (int j = 0; j < 32; j++)
-                    {
-                        int mask = 1 << j;
-                        if ((originalValue & mask) == 0)
-                        {
-                            int newValue = originalValue | mask;
-                            int result = Interlocked.CompareExchange(ref bitmap[i], newValue, originalValue);
-                            if (result == originalValue)
-                            {
-                                return (byte)((i * 32) + j);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
+            this.mask = mask;
         }
 
-        public void Release(byte id)
+        public int GetId()
         {
-            int index = id / 32;
-            int bitOffset = id % 32;
-            int mask = 1 << bitOffset;
-
-            while (true)
-            {
-                int originalValue = Volatile.Read(ref bitmap[index]);
-                int newValue = originalValue & ~mask;
-                int result = Interlocked.CompareExchange(ref bitmap[index], newValue, originalValue);
-                if (result == originalValue)
-                {
-                    break;
-                }
-            }
+            int id = Interlocked.Increment(ref sid);
+            return id ^ mask;
         }
     }
 }

@@ -1,0 +1,6 @@
+{
+    "name": "AillieoUtils.EasyLAN.Editor",
+    "references": [
+        "AillieoUtils.EasyLAN"
+    ]
+}

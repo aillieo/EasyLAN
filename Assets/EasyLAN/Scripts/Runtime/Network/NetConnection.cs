@@ -99,12 +99,19 @@ namespace AillieoUtils.EasyLAN
             onDisconnected?.Invoke();
         }
 
+        public async Task SendAsync(ByteBuffer buffer)
+        {
+            await SendAsync(buffer, CancellationToken.None);
+        }
+
         public async Task SendAsync(ByteBuffer buffer, CancellationToken cancellationToken)
         {
             if (!IsConnected())
             {
                 throw new ELException();
             }
+
+            UnityEngine.Debug.Log("[SEND]: " + buffer.ToArray().ToStringEx());
 
             int length = buffer.Length;
             buffer.Prepend(length);
@@ -126,15 +133,13 @@ namespace AillieoUtils.EasyLAN
                         break;
                     }
 
-                    var bytes = ByteArrayPool.shared.Get(length);
-                    var read = await this.stream.ReadBytesAsync(bytes, length, cancellationToken);
-                    if (read <= 0)
+                    var buffer = await this.stream.ReadBytesAsync(length, cancellationToken);
+                    if (buffer == null)
                     {
                         break;
                     }
                     else
                     {
-                        ByteBuffer buffer = new ByteBuffer(bytes, length);
                         this.OnData(buffer);
                     }
                 }
@@ -152,7 +157,9 @@ namespace AillieoUtils.EasyLAN
                 }
             }
 
-            this.OnDisconnected("");
+            string info = cancellationToken.IsCancellationRequested.ToString();
+
+            this.OnDisconnected(info);
 
             this.stream?.Close();
         }

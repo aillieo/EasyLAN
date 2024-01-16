@@ -6,7 +6,7 @@ namespace AillieoUtils.EasyLAN
 {
     public class NetPlayer : IDisposable
     {
-        public int id { get; internal set; }
+        public byte id { get; internal set; }
         public NetPlayerState state { get; internal set; }
         public NetPlayerFlag flag { get; internal set; }
 

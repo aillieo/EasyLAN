@@ -18,6 +18,8 @@ namespace AillieoUtils.EasyLAN
                 this.slots = new byte[capacity][];
             }
 
+            private readonly ReaderWriterLockSlim lockObject = new ReaderWriterLockSlim();
+
             public byte[] Get(int minimalLength)
             {
                 if (minimalLength == 0)
@@ -27,17 +29,33 @@ namespace AillieoUtils.EasyLAN
 
                 while (true)
                 {
-                    for (int i = 0, len = slots.Length; i < len; i++)
+                    lockObject.EnterUpgradeableReadLock();
+                    try
                     {
-                        if (slots[i] != null && slots[i].Length >= minimalLength)
+                        for (int i = 0, len = slots.Length; i < len; i++)
                         {
-                            var cur = slots[i];
-                            var exchanged = Interlocked.CompareExchange(ref slots[i], null, cur);
-                            if (exchanged == cur)
+                            if (slots[i] != null && slots[i].Length >= minimalLength)
                             {
-                                return exchanged;
+                                lockObject.EnterWriteLock();
+                                try
+                                {
+                                    if (slots[i] != null)
+                                    {
+                                        var cur = slots[i];
+                                        slots[i] = null;
+                                        return cur;
+                                    }
+                                }
+                                finally
+                                {
+                                    lockObject.ExitWriteLock();
+                                }
                             }
                         }
+                    }
+                    finally
+                    {
+                        lockObject.ExitUpgradeableReadLock();
                     }
 
                     var length = FindNearestPowerOfTwo(minimalLength);
@@ -52,21 +70,21 @@ namespace AillieoUtils.EasyLAN
                     return;
                 }
 
-                while (true)
+                lockObject.EnterWriteLock();
+                try
                 {
                     for (int i = 0, len = slots.Length; i < len; i++)
                     {
                         if (slots[i] == null)
                         {
-                            var exchanged = Interlocked.CompareExchange(ref slots[i], array, null);
-                            if (exchanged == null)
-                            {
-                                return;
-                            }
+                            slots[i] = array;
+                            return;
                         }
                     }
-
-                    return;
+                }
+                finally
+                {
+                    lockObject.ExitWriteLock();
                 }
             }
         }
@@ -76,13 +94,14 @@ namespace AillieoUtils.EasyLAN
 
         public ByteArrayPool(int capacity = 32)
         {
-            this.buckets = new Bucket[8];
+            // 1<<3 ... 1<<30
+            this.buckets = new Bucket[28];
 
             for (int i = 0; i < buckets.Length; i++)
             {
                 int minimalLengthRaw = 1 << (i + 3);
-                int subPoolCapacity = Math.Min(capacity, 16);
-                buckets[i] = new Bucket(minimalLengthRaw, subPoolCapacity);
+                int bucketCapacity = Math.Min(capacity, 16);
+                buckets[i] = new Bucket(minimalLengthRaw, bucketCapacity);
             }
         }
 
@@ -93,7 +112,7 @@ namespace AillieoUtils.EasyLAN
                 return Array.Empty<byte>();
             }
 
-            int index = Log2(minimalLength);
+            int index = Log2(minimalLength) - 3;
 
             if (index < 0 || index >= buckets.Length)
             {
@@ -111,7 +130,7 @@ namespace AillieoUtils.EasyLAN
                 return;
             }
 
-            int index = Log2(array.Length);
+            int index = Log2(array.Length) - 3;
 
             if (index < 0 || index >= buckets.Length)
             {
@@ -136,6 +155,12 @@ namespace AillieoUtils.EasyLAN
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int FindNearestPowerOfTwo(int value)
         {
+            // 1<<30
+            if (value > 0x40000000)
+            {
+                return int.MaxValue;
+            }
+
             int po2 = 8;
             while (po2 < value)
             {

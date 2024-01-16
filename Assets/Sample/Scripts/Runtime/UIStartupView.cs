@@ -1,6 +1,3 @@
-using AillieoUtils.EasyLAN;
-using System.Collections;
-using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
@@ -41,16 +38,7 @@ namespace AillieoUtils.EasyLAN.Sample
                 host = "host";
             }
 
-            NetGameMaker.Create(
-                new NetGameInfo()
-                {
-                    gameName = nameof(Sample),
-                },
-                new NetPlayerInfo()
-                {
-                    playerName = host,
-                },
-                cancellationTokenSource.Token);
+            //await NetGameInstance.Broadcast(host, 23333, "127.0.0.1", 23334, cancellationTokenSource.Token);
         }
 
         public async void SearchGames()
