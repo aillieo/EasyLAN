@@ -1,9 +1,14 @@
-using System;
-using System.Linq;
+// -----------------------------------------------------------------------
+// <copyright file="ByteArrayExtensions.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
-    public static class ByteArrayExtensions
+    using System.Linq;
+
+    internal static class ByteArrayExtensions
     {
         public static string ToStringEx(this byte[] bytes)
         {

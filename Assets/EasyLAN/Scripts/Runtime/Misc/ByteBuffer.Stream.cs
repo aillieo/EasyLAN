@@ -1,47 +1,52 @@
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
+// -----------------------------------------------------------------------
+// <copyright file="ByteBuffer.Stream.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
-    internal partial class ByteBuffer
+    using System.IO;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public partial class ByteBuffer
     {
-        public async Task<int> ReadFromStreamAsync(Stream stream, int count, CancellationToken cancellationToken)
+        internal async Task<int> ReadFromStreamAsync(Stream stream, int count, CancellationToken cancellationToken)
         {
             this.EnsureCapacity(count);
 
-            if (end + count <= capacity)
+            if (this.end + count <= this.capacity)
             {
                 var bytesRead = await stream.ReadAsync(this.buffer, this.end, count, cancellationToken);
-                end += bytesRead;
-                Length += bytesRead;
+                this.end += bytesRead;
+                this.Length += bytesRead;
                 return bytesRead;
             }
             else
             {
-                int bytesRead = 0;
+                var bytesRead = 0;
 
-                int remainingSpace = capacity - end;
+                var remainingSpace = this.capacity - this.end;
                 bytesRead += await stream.ReadAsync(this.buffer, this.end, remainingSpace, cancellationToken);
 
                 if (bytesRead < count)
                 {
-                    int remainingData = count - bytesRead;
-                    int newBytesRead = await stream.ReadAsync(this.buffer, 0, remainingData, cancellationToken);
+                    var remainingData = count - bytesRead;
+                    var newBytesRead = await stream.ReadAsync(this.buffer, 0, remainingData, cancellationToken);
                     bytesRead += newBytesRead;
-                    end = newBytesRead;
+                    this.end = newBytesRead;
                 }
                 else
                 {
-                    end += bytesRead;
+                    this.end += bytesRead;
                 }
 
                 return bytesRead;
             }
         }
 
-        public async Task WriteToStreamAsync(Stream stream, CancellationToken cancellationToken)
+        internal async Task WriteToStreamAsync(Stream stream, CancellationToken cancellationToken)
         {
             if (this.end > this.start)
             {
@@ -50,12 +55,12 @@ namespace AillieoUtils.EasyLAN
             }
             else
             {
-                int remainingData = capacity - start;
+                var remainingData = this.capacity - this.start;
                 await stream.WriteAsync(this.buffer, this.start, remainingData, cancellationToken);
 
-                if (end > 0)
+                if (this.end > 0)
                 {
-                    await stream.WriteAsync(this.buffer, 0, end, cancellationToken);
+                    await stream.WriteAsync(this.buffer, 0, this.end, cancellationToken);
                 }
 
                 this.Clear();

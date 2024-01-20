@@ -1,33 +1,129 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
+// -----------------------------------------------------------------------
+// <copyright file="NetGameInstance.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Net;
+    using System.Net.Sockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     public class NetGameInstance : IDisposable
     {
-        public event Action<NetPlayer> onNewPlayer;
-        public event Action<NetPlayer> onPlayerLeave;
-        public event Action<NetGameState> onGameStateChanged;
-        public event Action<int, byte[]> onPlayerMessage;
-
-        public NetGameState state { get; internal set; } = NetGameState.Uninitiated;
-        public NetGameInfo info { get; internal set; }
-        public NetPlayer localPlayer { get; internal set; }
-
         internal readonly IdGeneratorReusable idGenerator = new IdGeneratorReusable();
         internal readonly NetHandler netHandler = new NetHandler();
+
         private readonly Dictionary<byte, NetPlayer> allPlayers = new Dictionary<byte, NetPlayer>();
 
         internal NetGameInstance()
         {
-            netHandler.game = this;
+            this.netHandler.game = this;
+        }
 
-            netHandler.onData += (p, b) => UnityEngine.Debug.LogError($"收到来自 {p} 的消息 { System.Text.Encoding.UTF8.GetString(b) }");
+        public event Action<NetPlayer> onNewPlayer;
+
+        public event Action<NetPlayer> onPlayerLeave;
+
+        public event Action<NetGameState> onGameStateChanged;
+
+        public event Action<int, byte[]> onPlayerMessage;
+
+        public NetGameState state { get; internal set; } = NetGameState.Uninitiated;
+
+        public NetGameInfo info { get; internal set; }
+
+        public NetPlayer localPlayer { get; internal set; }
+
+        public IEnumerable<NetPlayer> GetAllPlayers()
+        {
+            foreach (var pair in this.allPlayers)
+            {
+                var player = pair.Value;
+                if (player != null && player.IsConnected() && player.state == NetPlayerState.Authenticated)
+                {
+                    yield return player;
+                }
+            }
+        }
+
+        public void Start()
+        {
+            if (!this.localPlayer.IsHost())
+            {
+                throw new InvalidOperationException();
+            }
+
+            if (this.state != NetGameState.Ready)
+            {
+                throw new InvalidOperationException();
+            }
+
+            var msg = SerializeUtils.Serialize(new SyncNetGameState() { state = NetGameState.GamePlaying });
+            this.Broadcast(msg, CancellationToken.None);
+
+            this.ChangeState(NetGameState.GamePlaying);
+        }
+
+        public bool IsListening()
+        {
+            return this.state == NetGameState.Listening;
+        }
+
+        public void StartAcceptPlayer(ref NetGameInfo info, CancellationToken cancellationToken)
+        {
+            var listener = new TcpListener(IPAddress.Any, 0);
+            listener.Start();
+
+            if (string.IsNullOrEmpty(info.ip))
+            {
+                info.ip = LANUtils.GetLocalIpAddress().ToString();
+            }
+
+            if (listener.LocalEndpoint is IPEndPoint iep)
+            {
+                info.port = iep.Port;
+            }
+
+            this.AcceptPlayerAsync(listener, cancellationToken).Await();
+        }
+
+        public NetPlayer GetPlayer(byte playerId)
+        {
+            if (this.allPlayers.TryGetValue(playerId, out NetPlayer player))
+            {
+                return player;
+            }
+
+            return null;
+        }
+
+        public void Send(byte playerId, byte[] data)
+        {
+            this.Send(playerId, data, CancellationToken.None);
+        }
+
+        public void Broadcast(byte[] data)
+        {
+            this.Broadcast(data, CancellationToken.None);
+        }
+
+        public void Send(byte target, byte[] data, CancellationToken cancellationToken)
+        {
+            var buffer = new ByteBuffer(data.Length);
+            buffer.Append(data);
+            this.netHandler.SendAsync(target, buffer, cancellationToken).Await();
+        }
+
+        public void Broadcast(byte[] data, CancellationToken cancellationToken)
+        {
+            var buffer = new ByteBuffer(data.Length);
+            buffer.Append(data);
+            this.netHandler.BroadcastAsync(buffer, cancellationToken).Await();
         }
 
         public void Dispose()
@@ -44,65 +140,15 @@ namespace AillieoUtils.EasyLAN
         {
         }
 
-        public IEnumerable<NetPlayer> GetAllPlayers()
-        {
-            foreach (var pair in this.allPlayers)
-            {
-                var player = pair.Value;
-                if (player != null && player.IsConnected() && player.state == NetPlayerState.Authenticated)
-                {
-                    yield return player;
-                }
-            }
-        }
-
         internal void ChangeState(NetGameState newState)
         {
-            if(this.state == newState)
+            if (this.state == newState)
             {
                 return;
             }
 
             this.state = newState;
             this.onGameStateChanged?.Invoke(newState);
-        }
-
-        public void Start()
-        {
-            if (!localPlayer.IsHost())
-            {
-                throw new InvalidOperationException();
-            }
-
-            //if (this.state != NetGameState.Ready)
-            //{
-            //    throw new InvalidOperationException();
-            //}
-
-            this.ChangeState(NetGameState.GamePlaying);
-        }
-
-        public bool IsListening()
-        {
-            return this.state == NetGameState.Listening;
-        }
-
-        public void StartAcceptPlayer(ref NetGameInfo info, CancellationToken cancellationToken)
-        {
-            TcpListener listener = new TcpListener(IPAddress.Any, 0);
-            listener.Start();
-
-            if (string.IsNullOrEmpty(info.ip))
-            {
-                info.ip = LANUtils.GetLocalIpAddress().ToString();
-            }
-
-            if (listener.LocalEndpoint is IPEndPoint iep)
-            {
-                info.port = iep.Port;
-            }
-
-            AcceptPlayerAsync(listener, cancellationToken).Await();
         }
 
         private async Task AcceptPlayerAsync(TcpListener listener, CancellationToken cancellationToken)
@@ -120,40 +166,6 @@ namespace AillieoUtils.EasyLAN
             }
 
             listener.Stop();
-        }
-
-        public NetPlayer GetPlayer(byte playerId)
-        {
-            if (this.allPlayers.TryGetValue(playerId, out NetPlayer player))
-            {
-                return player;
-            }
-
-            return null;
-        }
-
-        public void Send(byte playerId, byte[] data)
-        {
-            Send(playerId, data, CancellationToken.None);
-        }
-
-        public void Broadcast(byte[] data)
-        {
-            Broadcast(data, CancellationToken.None);
-        }
-
-        public void Send(byte target, byte[] data, CancellationToken cancellationToken)
-        {
-            ByteBuffer buffer = new ByteBuffer(data.Length);
-            buffer.Append(data);
-            this.netHandler.SendAsync(target, buffer, cancellationToken).Await();
-        }
-
-        public void Broadcast(byte[] data, CancellationToken cancellationToken)
-        {
-            ByteBuffer buffer = new ByteBuffer(data.Length);
-            buffer.Append(data);
-            this.netHandler.BroadcastAsync(buffer, cancellationToken).Await();
         }
     }
 }

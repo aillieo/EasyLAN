@@ -1,10 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Threading;
+// -----------------------------------------------------------------------
+// <copyright file="ByteArrayPool.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Runtime.CompilerServices;
+    using System.Threading;
+
     internal class ByteArrayPool
     {
         private class Bucket
@@ -29,33 +34,33 @@ namespace AillieoUtils.EasyLAN
 
                 while (true)
                 {
-                    lockObject.EnterUpgradeableReadLock();
+                    this.lockObject.EnterUpgradeableReadLock();
                     try
                     {
-                        for (int i = 0, len = slots.Length; i < len; i++)
+                        for (int i = 0, len = this.slots.Length; i < len; i++)
                         {
-                            if (slots[i] != null && slots[i].Length >= minimalLength)
+                            if (this.slots[i] != null && this.slots[i].Length >= minimalLength)
                             {
-                                lockObject.EnterWriteLock();
+                                this.lockObject.EnterWriteLock();
                                 try
                                 {
-                                    if (slots[i] != null)
+                                    if (this.slots[i] != null)
                                     {
-                                        var cur = slots[i];
-                                        slots[i] = null;
+                                        var cur = this.slots[i];
+                                        this.slots[i] = null;
                                         return cur;
                                     }
                                 }
                                 finally
                                 {
-                                    lockObject.ExitWriteLock();
+                                    this.lockObject.ExitWriteLock();
                                 }
                             }
                         }
                     }
                     finally
                     {
-                        lockObject.ExitUpgradeableReadLock();
+                        this.lockObject.ExitUpgradeableReadLock();
                     }
 
                     var length = FindNearestPowerOfTwo(minimalLength);
@@ -70,21 +75,21 @@ namespace AillieoUtils.EasyLAN
                     return;
                 }
 
-                lockObject.EnterWriteLock();
+                this.lockObject.EnterWriteLock();
                 try
                 {
-                    for (int i = 0, len = slots.Length; i < len; i++)
+                    for (int i = 0, len = this.slots.Length; i < len; i++)
                     {
-                        if (slots[i] == null)
+                        if (this.slots[i] == null)
                         {
-                            slots[i] = array;
+                            this.slots[i] = array;
                             return;
                         }
                     }
                 }
                 finally
                 {
-                    lockObject.ExitWriteLock();
+                    this.lockObject.ExitWriteLock();
                 }
             }
         }
@@ -97,11 +102,11 @@ namespace AillieoUtils.EasyLAN
             // 1<<3 ... 1<<30
             this.buckets = new Bucket[28];
 
-            for (int i = 0; i < buckets.Length; i++)
+            for (var i = 0; i < this.buckets.Length; i++)
             {
-                int minimalLengthRaw = 1 << (i + 3);
-                int bucketCapacity = Math.Min(capacity, 16);
-                buckets[i] = new Bucket(minimalLengthRaw, bucketCapacity);
+                var minimalLengthRaw = 1 << (i + 3);
+                var bucketCapacity = Math.Min(capacity, 16);
+                this.buckets[i] = new Bucket(minimalLengthRaw, bucketCapacity);
             }
         }
 
@@ -112,15 +117,15 @@ namespace AillieoUtils.EasyLAN
                 return Array.Empty<byte>();
             }
 
-            int index = Log2(minimalLength) - 3;
+            var index = Log2(minimalLength) - 3;
 
-            if (index < 0 || index >= buckets.Length)
+            if (index < 0 || index >= this.buckets.Length)
             {
                 var length = FindNearestPowerOfTwo(minimalLength);
                 return new byte[length];
             }
 
-            return buckets[index].Get(minimalLength);
+            return this.buckets[index].Get(minimalLength);
         }
 
         public void Recycle(byte[] array)
@@ -130,25 +135,26 @@ namespace AillieoUtils.EasyLAN
                 return;
             }
 
-            int index = Log2(array.Length) - 3;
+            var index = Log2(array.Length) - 3;
 
-            if (index < 0 || index >= buckets.Length)
+            if (index < 0 || index >= this.buckets.Length)
             {
                 return;
             }
 
-            buckets[index].Recycle(array);
+            this.buckets[index].Recycle(array);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int Log2(int value)
         {
-            int result = 0;
+            var result = 0;
             while (value > 1)
             {
                 value >>= 1;
                 result++;
             }
+
             return result;
         }
 
@@ -161,7 +167,7 @@ namespace AillieoUtils.EasyLAN
                 return int.MaxValue;
             }
 
-            int po2 = 8;
+            var po2 = 8;
             while (po2 < value)
             {
                 po2 = po2 << 1;

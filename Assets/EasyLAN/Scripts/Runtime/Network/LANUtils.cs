@@ -1,17 +1,24 @@
-using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-using UnityEngine;
+// -----------------------------------------------------------------------
+// <copyright file="LANUtils.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Net;
+    using System.Net.NetworkInformation;
+    using System.Net.Sockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using UnityEngine;
+
     internal static class LANUtils
     {
         public delegate bool Matcher(byte[] rawBytes);
+
         public delegate bool Parser<T>(byte[] rawBytes, out T obj);
 
         public static bool IsNetworkAvailable()
@@ -26,12 +33,12 @@ namespace AillieoUtils.EasyLAN
 
         public static async Task<T[]> Search<T>(int portToSend, byte[] pattern, Parser<T> parser, CancellationToken cancellationToken)
         {
-            using (UdpClient udpClient = new UdpClient())
+            using (var udpClient = new UdpClient())
             {
                 udpClient.EnableBroadcast = true;
 
                 // 客户端广播自己 去找服务器
-                IPEndPoint broadcast = new IPEndPoint(IPAddress.Broadcast, portToSend);
+                var broadcast = new IPEndPoint(IPAddress.Broadcast, portToSend);
                 await udpClient.SendAsync(pattern, pattern.Length, broadcast);
 
                 if (cancellationToken.IsCancellationRequested)
@@ -78,15 +85,15 @@ namespace AillieoUtils.EasyLAN
 
         public static async Task Listen(int portToListen, Matcher matcher, byte[] response, CancellationToken cancellationToken)
         {
-            using (UdpClient udpClient = new UdpClient(portToListen))
+            using (var udpClient = new UdpClient(portToListen))
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     // 服务器监听客户端消息
                     while (udpClient.Available > 0 && !cancellationToken.IsCancellationRequested)
                     {
-                        IPEndPoint any = new IPEndPoint(IPAddress.Any, portToListen);
-                        byte[] receive = udpClient.Receive(ref any);
+                        var any = new IPEndPoint(IPAddress.Any, portToListen);
+                        var receive = udpClient.Receive(ref any);
                         if (matcher(receive))
                         {
                             await udpClient.SendAsync(response, response.Length, any);
@@ -113,7 +120,7 @@ namespace AillieoUtils.EasyLAN
                         {
                             IPAddress localIpAddress = ipInfo.Address;
 
-                            if(IsPrivateIp(localIpAddress))
+                            if (IsPrivateIp(localIpAddress))
                             {
                                 return localIpAddress;
                             }
@@ -127,7 +134,7 @@ namespace AillieoUtils.EasyLAN
 
         private static bool IsPrivateIp(IPAddress ipAddress)
         {
-            byte[] addressBytes = ipAddress.GetAddressBytes();
+            var addressBytes = ipAddress.GetAddressBytes();
 
             if (addressBytes.Length == 4)
             {

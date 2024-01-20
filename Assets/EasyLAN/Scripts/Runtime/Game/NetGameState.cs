@@ -1,6 +1,12 @@
+// -----------------------------------------------------------------------
+// <copyright file="NetGameState.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
+
 namespace AillieoUtils.EasyLAN
 {
-    public enum NetGameState
+    public enum NetGameState : byte
     {
         Uninitiated = 0,
         Listening = 1,

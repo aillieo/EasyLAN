@@ -1,7 +1,13 @@
-using System;
+// -----------------------------------------------------------------------
+// <copyright file="NetPlayerFlag.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+
     [Flags]
     public enum NetPlayerFlag
     {

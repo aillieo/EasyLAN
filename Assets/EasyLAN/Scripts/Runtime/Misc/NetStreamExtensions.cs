@@ -1,10 +1,15 @@
-using System;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
+// -----------------------------------------------------------------------
+// <copyright file="NetStreamExtensions.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System.Net.Sockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     internal static class NetStreamExtensions
     {
         internal static async Task<int> ReadAsync(this NetworkStream stream, ByteBuffer buffer, int count, CancellationToken cancellationToken)
@@ -19,25 +24,25 @@ namespace AillieoUtils.EasyLAN
 
         internal static async Task<int> ReadIntAsync(this NetworkStream stream, CancellationToken cancellationToken)
         {
-            ByteBuffer buffer = new ByteBuffer(4);
-            int bytesRead = await stream.ReadAsync(buffer, 4, cancellationToken);
+            var buffer = new ByteBuffer(4);
+            var bytesRead = await stream.ReadAsync(buffer, 4, cancellationToken);
             if (bytesRead != 4)
             {
                 return -1;
             }
 
-            int lengthValue = buffer.ConsumeInt();
+            var lengthValue = buffer.ConsumeInt();
             return lengthValue;
         }
 
         internal static async Task<ByteBuffer> ReadBytesAsync(this NetworkStream stream, int length, CancellationToken cancellationToken)
         {
-            int totalBytesRead = 0;
-            ByteBuffer buffer = new ByteBuffer(length);
+            var totalBytesRead = 0;
+            var buffer = new ByteBuffer(length);
 
             while (totalBytesRead < length)
             {
-                int bytesRead = await stream.ReadAsync(buffer, length - totalBytesRead, cancellationToken);
+                var bytesRead = await stream.ReadAsync(buffer, length - totalBytesRead, cancellationToken);
 
                 if (bytesRead == 0)
                 {

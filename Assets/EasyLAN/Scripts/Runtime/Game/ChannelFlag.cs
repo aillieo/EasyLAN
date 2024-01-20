@@ -1,3 +1,9 @@
+// -----------------------------------------------------------------------
+// <copyright file="ChannelFlag.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
+
 namespace AillieoUtils.EasyLAN
 {
     internal static class ChannelFlag

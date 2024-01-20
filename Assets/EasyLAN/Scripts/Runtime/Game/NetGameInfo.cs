@@ -1,53 +1,69 @@
-using System;
-using System.Text;
-using UnityEngine;
+// -----------------------------------------------------------------------
+// <copyright file="NetGameInfo.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Text;
+    using UnityEngine;
+
     [Serializable]
+    [Proto(1)]
     public struct NetGameInfo : IProtocol
     {
+        internal static readonly byte[] headBytes = Encoding.UTF8.GetBytes("AU.EL.NGI");
+
         public string gameName;
         public string playerName;
-        public int version;
+        public string version;
 
         public string ip;
         public int port;
 
-        public static readonly byte[] headBytes = Encoding.UTF8.GetBytes("AU.EL.NGI");
-
         public override string ToString()
         {
-            return $"gameName={gameName},playerName={playerName},version={version},ip={ip},port={port}";
+            return $"gameName={this.gameName},playerName={this.playerName},version={this.version},ip={this.ip},port={this.port}";
         }
 
-        public static byte[] Serialize(NetGameInfo netGameInfo)
+        internal static bool ParseRawBytes(byte[] rawBytes, out NetGameInfo obj)
         {
+            try
             {
-                return SerializeUtils.Serialize(netGameInfo);
-            }
-
-            string json = JsonUtility.ToJson(netGameInfo);
-            string data = $"{netGameInfo.version}|{json}";
-            byte[] bodyBytes = Encoding.UTF8.GetBytes(data);
-            byte[] bytes = new byte[headBytes.Length + bodyBytes.Length];
-            Array.Copy(headBytes, 0, bytes, 0, headBytes.Length);
-            Array.Copy(bodyBytes, 0, bytes, headBytes.Length, bodyBytes.Length);
-            return bytes;
-        }
-
-        public static bool ValidateHead(byte[] bytes)
-        {
-            {
+                var buffer = new ByteBuffer(rawBytes);
+                obj = default;
+                obj.Deserialize(buffer);
                 return true;
             }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogException(e);
+            }
 
-            if (bytes.Length < headBytes.Length)
+            obj = default;
+            return true;
+        }
+
+        internal static bool ValidateRawBytes(byte[] bytes)
+        {
+            return true;
+        }
+
+        internal static bool ValidateVersion(string local, string remote)
+        {
+            return true;
+        }
+
+        internal static bool ValidateHead(byte[] bytes)
+        {
+            if (bytes.Length != headBytes.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < headBytes.Length; ++i)
+            for (var i = 0; i < headBytes.Length; ++i)
             {
                 if (headBytes[i] != bytes[i])
                 {
@@ -58,48 +74,45 @@ namespace AillieoUtils.EasyLAN
             return true;
         }
 
-        public static bool Deserialize(byte[] buffer, out NetGameInfo netGameInfo)
+        internal byte[] GetRawBytes()
         {
+            return this.ToBytes();
+        }
+
+        public void Serialize(ByteBuffer writeTo)
+        {
+            writeTo.Append(headBytes.Length);
+            writeTo.Append(headBytes);
+            writeTo.Append(this.version);
+            var json = JsonUtility.ToJson(this);
+            writeTo.Append(json);
+        }
+
+        public void Deserialize(ByteBuffer readFrom)
+        {
+            var headerLen = readFrom.ConsumeInt();
+            var header = readFrom.Consume(headerLen);
+            if (!ValidateHead(header))
             {
-                var succeed = SerializeUtils.Deserialize(buffer, out IProtocol o);
-                if (succeed)
-                {
-                    netGameInfo = (NetGameInfo)o;
-                    return true;
-                }
-                else
-                {
-                    netGameInfo = default;
-                    return false;
-                }
+                UnityEngine.Debug.LogError("invalid header");
+                return;
             }
 
-            if (!ValidateHead(buffer))
+            var remoteVersion = readFrom.ConsumeString();
+            if (!ValidateVersion(this.version, remoteVersion))
             {
-                netGameInfo = default;
-                return false;
+                UnityEngine.Debug.LogError("invalid version");
+                return;
             }
 
             try
             {
-                string body = Encoding.UTF8.GetString(buffer, headBytes.Length, buffer.Length - headBytes.Length);
-                int sep = body.IndexOf('|');
-                if (sep < 0)
-                {
-                    netGameInfo = default;
-                    return false;
-                }
-
-                string version = body.Substring(0, sep);
-                string json = body.Substring(sep + 1);
-                netGameInfo = JsonUtility.FromJson<NetGameInfo>(json);
-                return true;
+                var json = readFrom.ConsumeString();
+                this = JsonUtility.FromJson<NetGameInfo>(json);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 UnityEngine.Debug.LogException(e);
-                netGameInfo = default;
-                return false;
             }
         }
     }

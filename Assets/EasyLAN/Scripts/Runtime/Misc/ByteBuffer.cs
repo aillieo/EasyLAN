@@ -1,19 +1,25 @@
-using System;
-using System.Text;
+// -----------------------------------------------------------------------
+// <copyright file="ByteBuffer.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
-    internal partial class ByteBuffer : IDisposable
+    using System;
+    using System.Text;
+
+    public partial class ByteBuffer : IDisposable
     {
+        private static readonly bool isLittleEndian;
+
         private byte[] buffer;
         private int start;
         private int end;
 
         private int capacity;
 
-        public int Length { get; private set; }
-
-        private static readonly bool isLittleEndian;
+        internal int Length { get; private set; }
 
         static ByteBuffer()
         {
@@ -22,36 +28,41 @@ namespace AillieoUtils.EasyLAN
 
         public ByteBuffer(int capacity)
         {
-            buffer = ByteArrayPool.shared.Get(capacity);
-            this.capacity = buffer.Length;
-            start = 0;
-            end = 0;
-            Length = 0;
+            this.buffer = ByteArrayPool.shared.Get(capacity);
+            this.capacity = this.buffer.Length;
+            this.start = 0;
+            this.end = 0;
+            this.Length = 0;
         }
 
-        public ByteBuffer(byte[] data, int length)
+        public ByteBuffer(byte[] data)
+            : this(data, 0, data.Length)
         {
-            buffer = data;
-            this.capacity = buffer.Length;
-            start = 0;
-            end = length;
-            Length = length;
+        }
+
+        public ByteBuffer(byte[] data, int index, int count)
+        {
+            this.buffer = data;
+            this.capacity = this.buffer.Length;
+            this.start = index;
+            this.end = index + count;
+            this.Length = count;
         }
 
         public ByteBuffer Copy()
         {
-            ByteBuffer copy = new ByteBuffer(this.Length);
-            if (Length > 0)
+            var copy = new ByteBuffer(this.Length);
+            if (this.Length > 0)
             {
-                if (start < end)
+                if (this.start < this.end)
                 {
-                    Array.Copy(buffer, start, copy.buffer, 0, Length);
+                    Array.Copy(this.buffer, this.start, copy.buffer, 0, this.Length);
                 }
                 else
                 {
-                    int remainingData = capacity - start;
-                    Array.Copy(buffer, start, copy.buffer, 0, remainingData);
-                    Array.Copy(buffer, 0, copy.buffer, remainingData, Length - remainingData);
+                    var remainingData = this.capacity - this.start;
+                    Array.Copy(this.buffer, this.start, copy.buffer, 0, remainingData);
+                    Array.Copy(this.buffer, 0, copy.buffer, remainingData, this.Length - remainingData);
                 }
             }
 
@@ -69,22 +80,22 @@ namespace AillieoUtils.EasyLAN
                 throw new ArgumentNullException(nameof(data));
             }
 
-            EnsureCapacity(count);
+            this.EnsureCapacity(count);
 
-            if (end + count <= capacity)
+            if (this.end + count <= this.capacity)
             {
-                Array.Copy(data, index, buffer, end, count);
-                end += count;
+                Array.Copy(data, index, this.buffer, this.end, count);
+                this.end += count;
             }
             else
             {
-                int remainingSpace = capacity - end;
-                Array.Copy(data, index, buffer, end, remainingSpace);
-                Array.Copy(data, index + remainingSpace, buffer, 0, count - remainingSpace);
-                end = count - remainingSpace;
+                var remainingSpace = this.capacity - this.end;
+                Array.Copy(data, index, this.buffer, this.end, remainingSpace);
+                Array.Copy(data, index + remainingSpace, this.buffer, 0, count - remainingSpace);
+                this.end = count - remainingSpace;
             }
 
-            Length += count;
+            this.Length += count;
         }
 
         public void Append(byte[] data)
@@ -99,22 +110,22 @@ namespace AillieoUtils.EasyLAN
                 throw new ArgumentNullException(nameof(data));
             }
 
-            EnsureCapacity(count);
+            this.EnsureCapacity(count);
 
-            if (start - count >= 0)
+            if (this.start - count >= 0)
             {
-                start -= count;
-                Array.Copy(data, index, buffer, start, count);
+                this.start -= count;
+                Array.Copy(data, index, this.buffer, this.start, count);
             }
             else
             {
-                int remainingSpace = start;
-                start = capacity - (count - remainingSpace);
-                Array.Copy(data, index, buffer, start, remainingSpace);
-                Array.Copy(data, index + remainingSpace, buffer, 0, count - remainingSpace);
+                var remainingSpace = this.start;
+                this.start = this.capacity - (count - remainingSpace);
+                Array.Copy(data, index, this.buffer, this.start, remainingSpace);
+                Array.Copy(data, index + remainingSpace, this.buffer, 0, count - remainingSpace);
             }
 
-            Length += count;
+            this.Length += count;
         }
 
         public void Prepend(byte[] data)
@@ -124,93 +135,93 @@ namespace AillieoUtils.EasyLAN
                 throw new ArgumentNullException(nameof(data));
             }
 
-            Prepend(data, 0, data.Length);
+            this.Prepend(data, 0, data.Length);
         }
 
         public void Append(short data)
         {
-            EnsureCapacity(2);
+            this.EnsureCapacity(2);
 
-            WriteShort(start, data);
-            end = (end + 2) % capacity;
+            this.WriteShort(this.start, data);
+            this.end = (this.end + 2) % this.capacity;
 
-            Length += 2;
+            this.Length += 2;
         }
 
         public void Prepend(short data)
         {
-            EnsureCapacity(2);
+            this.EnsureCapacity(2);
 
-            start = (start - 2 + capacity) % capacity;
-            WriteShort(start, data);
+            this.start = (this.start - 2 + this.capacity) % this.capacity;
+            this.WriteShort(this.start, data);
 
-            Length += 2;
+            this.Length += 2;
         }
 
         public void Append(int data)
         {
-            EnsureCapacity(4);
+            this.EnsureCapacity(4);
 
-            WriteInt(start, data);
-            end = (end + 4) % capacity;
+            this.WriteInt(this.end, data);
+            this.end = (this.end + 4) % this.capacity;
 
-            Length += 4;
+            this.Length += 4;
         }
 
         public void Prepend(int data)
         {
-            EnsureCapacity(4);
+            this.EnsureCapacity(4);
 
-            start = (start - 4 + capacity) % capacity;
-            WriteInt(start, data);
+            this.start = (this.start - 4 + this.capacity) % this.capacity;
+            this.WriteInt(this.start, data);
 
-            Length += 4;
+            this.Length += 4;
         }
 
         public void Prepend(char data)
         {
-            Prepend((byte)data);
+            this.Prepend((byte)data);
         }
 
         public void Append(char data)
         {
-            Append((byte)data);
+            this.Append((byte)data);
         }
 
         public void Prepend(byte data)
         {
-            EnsureCapacity(1);
+            this.EnsureCapacity(1);
 
-            start = (start - 1 + capacity) % capacity;
-            buffer[start] = data;
+            this.start = (this.start - 1 + this.capacity) % this.capacity;
+            this.buffer[this.start] = data;
 
-            Length++;
+            this.Length++;
         }
 
         public void Append(byte data)
         {
-            EnsureCapacity(1);
+            this.EnsureCapacity(1);
 
-            buffer[end] = data;
-            end = (end + 1) % capacity;
+            this.buffer[this.end] = data;
+            this.end = (this.end + 1) % this.capacity;
 
-            Length++;
+            this.Length++;
         }
 
         public byte[] ToArray()
         {
-            byte[] byteArray = new byte[Length];
-            if (Length > 0)
+            var byteArray = new byte[this.Length];
+            if (this.Length > 0)
             {
-                if (start < end)
+                if (this.start < this.end)
                 {
-                    Array.Copy(buffer, start, byteArray, 0, Length);
+                    Array.Copy(this.buffer, this.start, byteArray, 0, this.Length);
                 }
                 else
                 {
-                    int remainingData = capacity - start;
-                    Array.Copy(buffer, start, byteArray, 0, remainingData);
-                    Array.Copy(buffer, 0, byteArray, remainingData, Length - remainingData);
+                    var remainingData = this.capacity - this.start;
+                    Array.Copy(this.buffer, this.start, byteArray, 0, remainingData);
+                    Array.Copy(this.buffer, 0, byteArray, remainingData, this.Length - remainingData);
                 }
             }
 
@@ -219,37 +230,37 @@ namespace AillieoUtils.EasyLAN
 
         private void EnsureCapacity(int requiredCapacity)
         {
-            if (requiredCapacity > capacity - Length)
+            if (requiredCapacity > this.capacity - this.Length)
             {
-                int newCapacity = Math.Max(capacity * 2, capacity + requiredCapacity);
-                byte[] newBuffer = ByteArrayPool.shared.Get(newCapacity);
+                var newCapacity = Math.Max(this.capacity * 2, this.capacity + requiredCapacity);
+                var newBuffer = ByteArrayPool.shared.Get(newCapacity);
                 newCapacity = newBuffer.Length;
 
-                if (Length > 0)
+                if (this.Length > 0)
                 {
-                    if (start < end)
+                    if (this.start < this.end)
                     {
-                        Array.Copy(buffer, start, newBuffer, 0, Length);
+                        Array.Copy(this.buffer, this.start, newBuffer, 0, this.Length);
                     }
                     else
                     {
-                        int remainingData = capacity - start;
-                        Array.Copy(buffer, start, newBuffer, 0, remainingData);
-                        Array.Copy(buffer, 0, newBuffer, remainingData, Length - remainingData);
+                        var remainingData = this.capacity - this.start;
+                        Array.Copy(this.buffer, this.start, newBuffer, 0, remainingData);
+                        Array.Copy(this.buffer, 0, newBuffer, remainingData, this.Length - remainingData);
                     }
                 }
 
-                var oldBuffer = buffer;
-                buffer = newBuffer;
+                var oldBuffer = this.buffer;
+                this.buffer = newBuffer;
 
-                if (buffer.Length > 0)
+                if (oldBuffer.Length > 0)
                 {
                     ByteArrayPool.shared.Recycle(oldBuffer);
                 }
 
-                capacity = newCapacity;
-                start = 0;
-                end = Length;
+                this.capacity = newCapacity;
+                this.start = 0;
+                this.end = this.Length;
             }
         }
 
@@ -257,15 +268,15 @@ namespace AillieoUtils.EasyLAN
         {
             if (isLittleEndian)
             {
-                buffer[startIndex] = (byte)(data & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 8) & 0xFF);
+                this.buffer[startIndex] = (byte)(data & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 8) & 0xFF);
             }
             else
             {
-                buffer[startIndex] = (byte)((data >> 8) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)(data & 0xFF);
+                this.buffer[startIndex] = (byte)((data >> 8) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)(data & 0xFF);
             }
         }
 
@@ -273,86 +284,86 @@ namespace AillieoUtils.EasyLAN
         {
             if (isLittleEndian)
             {
-                buffer[startIndex] = (byte)(data & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 8) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 16) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 24) & 0xFF);
+                this.buffer[startIndex] = (byte)(data & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 8) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 16) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 24) & 0xFF);
             }
             else
             {
-                buffer[startIndex] = (byte)((data >> 24) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 16) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)((data >> 8) & 0xFF);
-                startIndex = (startIndex + 1) % capacity;
-                buffer[startIndex] = (byte)(data & 0xFF);
+                this.buffer[startIndex] = (byte)((data >> 24) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 16) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)((data >> 8) & 0xFF);
+                startIndex = (startIndex + 1) % this.capacity;
+                this.buffer[startIndex] = (byte)(data & 0xFF);
             }
         }
 
         public byte[] Consume(int count)
         {
-            if (count > Length)
+            if (count > this.Length)
             {
-                throw new InvalidOperationException();
+                throw new ELException($"this.Length = {this.Length} but count = {count}");
             }
 
-            byte[] result = new byte[count];
+            var result = new byte[count];
             this.Consume(count, result, 0);
             return result;
         }
 
         public void Consume(int count, byte[] destinationArray, int destinationIndex)
         {
-            if (count > Length)
+            if (count > this.Length)
             {
                 throw new InvalidOperationException();
             }
 
-            if (start + count <= capacity)
+            if (this.start + count <= this.capacity)
             {
-                Array.Copy(buffer, start, destinationArray, destinationIndex, count);
-                start += count;
+                Array.Copy(this.buffer, this.start, destinationArray, destinationIndex, count);
+                this.start += count;
             }
             else
             {
-                int remainingData = capacity - start;
-                Array.Copy(buffer, start, destinationArray, destinationIndex, remainingData);
-                Array.Copy(buffer, 0, destinationArray, destinationIndex + remainingData, count - remainingData);
-                start = count - remainingData;
+                var remainingData = this.capacity - this.start;
+                Array.Copy(this.buffer, this.start, destinationArray, destinationIndex, remainingData);
+                Array.Copy(this.buffer, 0, destinationArray, destinationIndex + remainingData, count - remainingData);
+                this.start = count - remainingData;
             }
 
-            Length -= count;
+            this.Length -= count;
         }
 
         public byte ConsumeByte()
         {
-            if (Length < 1)
+            if (this.Length < 1)
             {
                 throw new ELException("Not enough bytes");
             }
 
-            byte result = buffer[start];
-            start = (start + 1) % buffer.Length;
+            var result = this.buffer[this.start];
+            this.start = (this.start + 1) % this.buffer.Length;
 
-            Length -= 1;
+            this.Length -= 1;
             return result;
         }
 
         public int ConsumeInt()
         {
-            if (Length < 4)
+            if (this.Length < 4)
             {
                 throw new ELException("Not enough bytes");
             }
 
-            int result = ReadInt(start);
-            start = (start + 4) % buffer.Length;
+            var result = this.ReadInt(this.start);
+            this.start = (this.start + 4) % this.buffer.Length;
 
-            Length -= 4;
+            this.Length -= 4;
             return result;
         }
 
@@ -360,32 +371,38 @@ namespace AillieoUtils.EasyLAN
         {
             if (isLittleEndian)
             {
-                int value = buffer[startIndex];
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex] << 8;
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex] << 16;
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex] << 24;
+                int value = this.buffer[startIndex];
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex] << 8;
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex] << 16;
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex] << 24;
                 return value;
             }
             else
             {
-                int value = buffer[startIndex] << 24;
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex] << 16;
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex] << 8;
-                startIndex = (startIndex + 1) % capacity;
-                value |= buffer[startIndex];
+                var value = this.buffer[startIndex] << 24;
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex] << 16;
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex] << 8;
+                startIndex = (startIndex + 1) % this.capacity;
+                value |= this.buffer[startIndex];
                 return value;
             }
         }
 
         public void Append(string data)
         {
-            int byteCount = Encoding.UTF8.GetByteCount(data);
-            byte[] byteArray = ByteArrayPool.shared.Get(byteCount);
+            if (string.IsNullOrEmpty(data))
+            {
+                this.Append((int)0);
+                return;
+            }
+
+            var byteCount = Encoding.UTF8.GetByteCount(data);
+            var byteArray = ByteArrayPool.shared.Get(byteCount);
 
             try
             {
@@ -401,8 +418,8 @@ namespace AillieoUtils.EasyLAN
 
         public string ConsumeString()
         {
-            int byteCount = this.ConsumeInt();
-            byte[] byteArray = ByteArrayPool.shared.Get(byteCount);
+            var byteCount = this.ConsumeInt();
+            var byteArray = ByteArrayPool.shared.Get(byteCount);
 
             try
             {
@@ -417,22 +434,22 @@ namespace AillieoUtils.EasyLAN
 
         public void Clear()
         {
-            start = 0;
-            end = 0;
-            Length = 0;
+            this.start = 0;
+            this.end = 0;
+            this.Length = 0;
 
-            if (buffer.Length > 0)
+            if (this.buffer.Length > 0)
             {
-                ByteArrayPool.shared.Recycle(buffer);
+                ByteArrayPool.shared.Recycle(this.buffer);
             }
 
-            buffer = Array.Empty<byte>();
-            capacity = 0;
+            this.buffer = Array.Empty<byte>();
+            this.capacity = 0;
         }
 
         public void Dispose()
         {
-            Clear();
+            this.Clear();
         }
     }
 }

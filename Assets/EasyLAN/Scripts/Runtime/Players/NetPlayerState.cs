@@ -1,3 +1,9 @@
+// -----------------------------------------------------------------------
+// <copyright file="NetPlayerState.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
+
 namespace AillieoUtils.EasyLAN
 {
     public enum NetPlayerState

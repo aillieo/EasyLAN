@@ -1,13 +1,21 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+// -----------------------------------------------------------------------
+// <copyright file="NetPlayer.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     public class NetPlayer : IDisposable
     {
         public byte id { get; internal set; }
+
         public NetPlayerState state { get; internal set; }
+
         public NetPlayerFlag flag { get; internal set; }
 
         public NetPlayerInfo info { get; internal set; }
@@ -18,16 +26,16 @@ namespace AillieoUtils.EasyLAN
 
         internal static NetPlayer CreateLocal(NetPlayerInfo info)
         {
-            NetPlayer netPlayer = new NetPlayer();
+            var netPlayer = new NetPlayer();
             netPlayer.info = info;
             netPlayer.flag |= NetPlayerFlag.Local;
 
             return netPlayer;
         }
 
-        internal async static Task<NetPlayer> AcceptRemote(NetConnection connection, NetGameInstance game, CancellationToken cancellationToken)
+        internal static async Task<NetPlayer> AcceptRemote(NetConnection connection, NetGameInstance game, CancellationToken cancellationToken)
         {
-            NetPlayer netPlayer = new NetPlayer();
+            var netPlayer = new NetPlayer();
             netPlayer.flag |= NetPlayerFlag.Remote;
             netPlayer.state = NetPlayerState.Initialized;
 
@@ -37,8 +45,8 @@ namespace AillieoUtils.EasyLAN
             var playerId = game.idGenerator.Get();
             netPlayer.id = playerId;
 
-            var InstanceId = new InstanceId() { value = playerId };
-            await connection.SendProto(InstanceId, cancellationToken);
+            var instanceId = new InstanceId() { value = playerId };
+            await connection.SendProto(instanceId, cancellationToken);
 
             netPlayer.state = NetPlayerState.Authenticated;
             netPlayer.connection = connection;
@@ -46,9 +54,9 @@ namespace AillieoUtils.EasyLAN
             return netPlayer;
         }
 
-        internal async static Task<NetPlayer> JoinRemote(NetConnection connection, NetPlayerInfo info, CancellationToken cancellationToken)
+        internal static async Task<NetPlayer> JoinRemote(NetConnection connection, NetPlayerInfo info, CancellationToken cancellationToken)
         {
-            NetPlayer netPlayer = new NetPlayer();
+            var netPlayer = new NetPlayer();
             netPlayer.flag |= NetPlayerFlag.Remote;
             netPlayer.info = info;
 
@@ -75,18 +83,18 @@ namespace AillieoUtils.EasyLAN
             return (this.flag & NetPlayerFlag.Local) > 0;
         }
 
+        public bool IsConnected()
+        {
+            return this.connection != null && this.connection.IsConnected();
+        }
+
         public void Dispose()
         {
-            if(this.connection != null)
+            if (this.connection != null)
             {
                 this.connection.Dispose();
                 this.connection = null;
             }
-        }
-
-        public bool IsConnected()
-        {
-            return this.connection != null && this.connection.IsConnected();
         }
     }
 }

@@ -1,32 +1,34 @@
-using System;
-using System.IO;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-using UnityEngine;
+// -----------------------------------------------------------------------
+// <copyright file="NetConnection.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.IO;
+    using System.Net.Sockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using UnityEngine;
+
     internal class NetConnection : IDisposable
     {
         private TcpClient tcpClient;
         private NetworkStream stream;
 
         public event Action<ByteBuffer> onData;
+
         public event Action onDisconnected;
 
         private NetConnection()
         {
         }
 
-        public bool IsConnected()
-        {
-            return this.tcpClient != null && this.tcpClient.Connected;
-        }
-
         public static async Task<NetConnection> ConnectAsync(string ip, int port, CancellationToken cancellationToken)
         {
-            TcpClient rawTcpClient = new TcpClient();
+            var rawTcpClient = new TcpClient();
 
             try
             {
@@ -39,18 +41,20 @@ namespace AillieoUtils.EasyLAN
                 return null;
             }
 
-            NetConnection netConnection = new NetConnection();
+            var netConnection = new NetConnection();
             netConnection.ConfigTcpClient(rawTcpClient, cancellationToken);
 
             return netConnection;
         }
+
+
 
         public static async Task<NetConnection> AcceptAsync(TcpListener listener, CancellationToken cancellationToken)
         {
             try
             {
                 var rawTcpClient = await listener.AcceptTcpClientAsync();
-                NetConnection netConnection = new NetConnection();
+                var netConnection = new NetConnection();
                 netConnection.ConfigTcpClient(rawTcpClient, cancellationToken);
                 return netConnection;
             }
@@ -68,52 +72,57 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
+        public bool IsConnected()
+        {
+            return this.tcpClient != null && this.tcpClient.Connected;
+        }
+
         private void ConfigTcpClient(TcpClient rawTcpClient, CancellationToken cancellationToken)
         {
             if (!cancellationToken.IsCancellationRequested)
             {
                 this.tcpClient = rawTcpClient;
-                this.stream = tcpClient.GetStream();
+                this.stream = this.tcpClient.GetStream();
                 this.StartReadingDataAsync(cancellationToken).Await();
             }
         }
 
         public void Dispose()
         {
-            if (tcpClient != null)
+            if (this.tcpClient != null)
             {
-                tcpClient.Dispose();
-                tcpClient = null;
+                this.tcpClient.Dispose();
+                this.tcpClient = null;
             }
         }
 
         private void OnData(ByteBuffer buffer)
         {
             UnityEngine.Debug.Log("[RECV]: " + buffer.ToArray().ToStringEx());
-            onData?.Invoke(buffer);
+            this.onData?.Invoke(buffer);
         }
 
         private void OnDisconnected(string data)
         {
             UnityEngine.Debug.Log("[CLOSE]: " + data);
-            onDisconnected?.Invoke();
+            this.onDisconnected?.Invoke();
         }
 
         public async Task SendAsync(ByteBuffer buffer)
         {
-            await SendAsync(buffer, CancellationToken.None);
+            await this.SendAsync(buffer, CancellationToken.None);
         }
 
         public async Task SendAsync(ByteBuffer buffer, CancellationToken cancellationToken)
         {
-            if (!IsConnected())
+            if (!this.IsConnected())
             {
                 throw new ELException();
             }
 
             UnityEngine.Debug.Log("[SEND]: " + buffer.ToArray().ToStringEx());
 
-            int length = buffer.Length;
+            var length = buffer.Length;
             buffer.Prepend(length);
             var data = buffer.ToArray();
             buffer.Clear();
@@ -157,7 +166,7 @@ namespace AillieoUtils.EasyLAN
                 }
             }
 
-            string info = cancellationToken.IsCancellationRequested.ToString();
+            var info = cancellationToken.IsCancellationRequested.ToString();
 
             this.OnDisconnected(info);
 

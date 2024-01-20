@@ -1,9 +1,15 @@
-using System;
-using System.Text;
-using UnityEngine;
+// -----------------------------------------------------------------------
+// <copyright file="SerializeUtils.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System;
+    using System.Text;
+    using UnityEngine;
+
     internal static class SerializeUtils
     {
         public static byte[] Serialize<T>(T obj)
@@ -58,11 +64,11 @@ namespace AillieoUtils.EasyLAN
                 index += headLength;
                 var json = Encoding.UTF8.GetString(bytes, index, bytes.Length - index);
                 UnityEngine.Debug.Log("[D] " + json);
-                Type type = Type.GetType(head);
+                var type = Type.GetType(head);
                 obj = JsonUtility.FromJson(json, type) as IProtocol;
                 return true;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 UnityEngine.Debug.LogException(e);
                 obj = default;

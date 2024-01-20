@@ -1,8 +1,14 @@
-using System.Threading;
-using System.Threading.Tasks;
+// -----------------------------------------------------------------------
+// <copyright file="NetGameMaker.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
+    using System.Threading;
+    using System.Threading.Tasks;
+
     public static class NetGameMaker
     {
         public static int broadcastPort = 23333;
@@ -10,14 +16,14 @@ namespace AillieoUtils.EasyLAN
         public static async Task<NetGameInfo[]> Search(int port, CancellationToken cancellationToken)
         {
             var bytes = NetGameInfo.headBytes;
-            return await LANUtils.Search<NetGameInfo>(port, bytes, NetGameInfo.Deserialize, cancellationToken);
+            return await LANUtils.Search<NetGameInfo>(port, bytes, NetGameInfo.ParseRawBytes, cancellationToken);
         }
 
         public static NetGameInstance Create(NetGameInfo gameInfo, NetPlayerInfo playerInfo, CancellationToken cancellationToken)
         {
             var game = new NetGameInstance();
 
-            NetPlayer host = NetPlayer.CreateLocal(playerInfo);
+            var host = NetPlayer.CreateLocal(playerInfo);
             host.flag |= NetPlayerFlag.Host;
             host.id = game.idGenerator.Get();
 
@@ -26,8 +32,8 @@ namespace AillieoUtils.EasyLAN
             game.StartAcceptPlayer(ref gameInfo, cancellationToken);
             game.info = gameInfo;
 
-            byte[] bytes = SerializeUtils.Serialize(gameInfo);
-            LANUtils.Listen(broadcastPort, NetGameInfo.ValidateHead, bytes, cancellationToken).Await();
+            var gameInfoBytes = gameInfo.GetRawBytes();
+            LANUtils.Listen(broadcastPort, NetGameInfo.ValidateHead, gameInfoBytes, cancellationToken).Await();
 
             return game;
         }

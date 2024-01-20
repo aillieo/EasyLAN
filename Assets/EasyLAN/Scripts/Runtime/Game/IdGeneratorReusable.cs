@@ -1,4 +1,8 @@
-using System.Threading;
+// -----------------------------------------------------------------------
+// <copyright file="IdGeneratorReusable.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN
 {
@@ -10,27 +14,28 @@ namespace AillieoUtils.EasyLAN
 
         public IdGeneratorReusable()
         {
-            bitmap = new int[4];
+            this.bitmap = new int[4];
         }
 
         public byte Get()
         {
             while (true)
             {
-                for (int i = 0; i < bitmap.Length; i++)
+                for (var i = 0; i < this.bitmap.Length; i++)
                 {
-                    int originalValue = Volatile.Read(ref bitmap[i]);
-                    for (int j = 0; j < 32; j++)
+                    var originalValue = Volatile.Read(ref this.bitmap[i]);
+                    for (var j = 0; j < 32; j++)
                     {
-                        int mask = 1 << j;
+                        var mask = 1 << j;
                         if ((originalValue & mask) == 0)
                         {
-                            int newValue = originalValue | mask;
-                            int result = Interlocked.CompareExchange(ref bitmap[i], newValue, originalValue);
+                            var newValue = originalValue | mask;
+                            var result = Interlocked.CompareExchange(ref this.bitmap[i], newValue, originalValue);
                             if (result == originalValue)
                             {
                                 return (byte)((i * 32) + j);
                             }
+
                             break;
                         }
                     }
@@ -40,15 +45,15 @@ namespace AillieoUtils.EasyLAN
 
         public void Release(byte id)
         {
-            int index = id / 32;
-            int bitOffset = id % 32;
-            int mask = 1 << bitOffset;
+            var index = id / 32;
+            var bitOffset = id % 32;
+            var mask = 1 << bitOffset;
 
             while (true)
             {
-                int originalValue = Volatile.Read(ref bitmap[index]);
-                int newValue = originalValue & ~mask;
-                int result = Interlocked.CompareExchange(ref bitmap[index], newValue, originalValue);
+                var originalValue = Volatile.Read(ref this.bitmap[index]);
+                var newValue = originalValue & ~mask;
+                var result = Interlocked.CompareExchange(ref this.bitmap[index], newValue, originalValue);
                 if (result == originalValue)
                 {
                     break;
