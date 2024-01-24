@@ -13,7 +13,7 @@ namespace AillieoUtils.EasyLAN
     internal static class NetConnectionExtensions
     {
         internal static async Task<T> ReceiveProto<T>(this NetConnection connection, CancellationToken cancellationToken)
-            where T : IProtocol, new()
+            where T : IProtocol
         {
             var taskCompletionSource = new TaskCompletionSource<T>();
 
@@ -24,7 +24,7 @@ namespace AillieoUtils.EasyLAN
                 {
                     var type = Protocols.GetType(proto);
 
-                    var o = new T();
+                    var o = (T)Activator.CreateInstance(type);
                     o.Deserialize(buffer);
 
                     connection.onData -= onData;

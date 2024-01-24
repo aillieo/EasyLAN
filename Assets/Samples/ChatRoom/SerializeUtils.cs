@@ -4,16 +4,15 @@
 // </copyright>
 // -----------------------------------------------------------------------
 
-namespace AillieoUtils.EasyLAN
+namespace AillieoUtils.EasyLAN.Sample
 {
     using System;
     using System.Text;
     using UnityEngine;
 
-    internal static class SerializeUtils
+    public static class SerializeUtils
     {
         public static byte[] Serialize<T>(T obj)
-            where T : IProtocol
         {
             try
             {
@@ -28,11 +27,6 @@ namespace AillieoUtils.EasyLAN
                 var headLengthBytes = BitConverter.GetBytes(headLength);
                 var index = 0;
 
-                //UnityEngine.Debug.Log("[S] " + head);
-                //UnityEngine.Debug.Log("[S] " + headLength);
-                UnityEngine.Debug.Log("[S] " + json);
-                //UnityEngine.Debug.Log("[S] " + length);
-
                 Array.Copy(lengthBytes, 0, bytes, index, lengthBytes.Length);
                 index += lengthBytes.Length;
                 Array.Copy(headLengthBytes, 0, bytes, index, headLengthBytes.Length);
@@ -40,8 +34,6 @@ namespace AillieoUtils.EasyLAN
                 Array.Copy(headBytes, 0, bytes, index, headBytes.Length);
                 index += headBytes.Length;
                 Array.Copy(jsonBytes, 0, bytes, index, jsonBytes.Length);
-
-                //UnityEngine.Debug.Log("[S] " + string.Join(",", bytes.Select(b=> b.ToString())));
 
                 return bytes;
             }
@@ -52,7 +44,7 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
-        public static bool Deserialize(byte[] bytes, out IProtocol obj)
+        public static bool Deserialize(byte[] bytes, out object obj)
         {
             try
             {
@@ -60,10 +52,8 @@ namespace AillieoUtils.EasyLAN
                 var headLength = BitConverter.ToInt32(bytes, index);
                 index += sizeof(int);
                 var head = Encoding.UTF8.GetString(bytes, index, headLength);
-                //UnityEngine.Debug.Log("[D] " + head);
                 index += headLength;
                 var json = Encoding.UTF8.GetString(bytes, index, bytes.Length - index);
-                UnityEngine.Debug.Log("[D] " + json);
                 var type = Type.GetType(head);
                 obj = JsonUtility.FromJson(json, type) as IProtocol;
                 return true;

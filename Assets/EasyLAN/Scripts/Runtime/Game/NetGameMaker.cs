@@ -24,10 +24,12 @@ namespace AillieoUtils.EasyLAN
             var game = new NetGameInstance();
 
             var host = NetPlayer.CreateLocal(playerInfo);
+            host.game = game;
             host.flag |= NetPlayerFlag.Host;
             host.id = game.idGenerator.Get();
 
             game.localPlayer = host;
+            game.hostPlayer = host.id;
 
             game.StartAcceptPlayer(ref gameInfo, cancellationToken);
             game.info = gameInfo;
@@ -45,6 +47,7 @@ namespace AillieoUtils.EasyLAN
 
             NetConnection connection = await NetConnection.ConnectAsync(gameInfo.ip, gameInfo.port, cancellationToken);
             var player = await NetPlayer.JoinRemote(connection, info, cancellationToken);
+            player.game = game;
 
             game.localPlayer = player;
 

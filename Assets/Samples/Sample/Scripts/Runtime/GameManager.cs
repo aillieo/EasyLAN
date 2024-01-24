@@ -1,7 +1,13 @@
-﻿using UnityEngine;
+// -----------------------------------------------------------------------
+// <copyright file="GameManager.cs" company="AillieoTech">
+// Copyright (c) AillieoTech. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
 
 namespace AillieoUtils.EasyLAN.Sample
 {
+    using UnityEngine;
+
     public class GameManager : MonoBehaviour
     {
         public static GameManager Instance
@@ -37,9 +43,8 @@ namespace AillieoUtils.EasyLAN.Sample
 
         public void LoadStartupView()
         {
-            GameObject viewAsset = resourcesManager.Get<GameObject>("UIStartupView");
-            Instantiate(viewAsset, uiRoot);
+            GameObject viewAsset = this.resourcesManager.Get<GameObject>("UIStartupView");
+            Instantiate(viewAsset, this.uiRoot);
         }
     }
-
 }

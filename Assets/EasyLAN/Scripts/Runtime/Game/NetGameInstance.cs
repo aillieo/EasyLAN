@@ -18,11 +18,13 @@ namespace AillieoUtils.EasyLAN
         internal readonly IdGeneratorReusable idGenerator = new IdGeneratorReusable();
         internal readonly NetHandler netHandler = new NetHandler();
 
+        internal byte hostPlayer;
         private readonly Dictionary<byte, NetPlayer> allPlayers = new Dictionary<byte, NetPlayer>();
 
         internal NetGameInstance()
         {
             this.netHandler.game = this;
+            this.netHandler.onData += this.HandleData;
         }
 
         public event Action<NetPlayer> onNewPlayer;
@@ -31,7 +33,7 @@ namespace AillieoUtils.EasyLAN
 
         public event Action<NetGameState> onGameStateChanged;
 
-        public event Action<int, byte[]> onPlayerMessage;
+        public event Action<byte, byte[]> onPlayerMessage;
 
         public NetGameState state { get; internal set; } = NetGameState.Uninitiated;
 
@@ -51,7 +53,7 @@ namespace AillieoUtils.EasyLAN
             }
         }
 
-        public void Start()
+        public async Task Start()
         {
             if (!this.localPlayer.IsHost())
             {
@@ -60,11 +62,14 @@ namespace AillieoUtils.EasyLAN
 
             if (this.state != NetGameState.Ready)
             {
-                throw new InvalidOperationException();
+                // throw new InvalidOperationException();
             }
 
-            var msg = SerializeUtils.Serialize(new SyncNetGameState() { state = NetGameState.GamePlaying });
-            this.Broadcast(msg, CancellationToken.None);
+            var buffer = new ByteBuffer(0);
+            buffer.Append(Protocols.GetId<SyncNetGameState>());
+            var gameState = new SyncNetGameState() { state = NetGameState.GamePlaying };
+            gameState.Serialize(buffer);
+            await this.netHandler.BroadcastAsync(buffer, CancellationToken.None);
 
             this.ChangeState(NetGameState.GamePlaying);
         }
@@ -102,6 +107,11 @@ namespace AillieoUtils.EasyLAN
             return null;
         }
 
+        public void SendToHost(byte[] data)
+        {
+            this.Send(this.hostPlayer, data, CancellationToken.None);
+        }
+
         public void Send(byte playerId, byte[] data)
         {
             this.Send(playerId, data, CancellationToken.None);
@@ -112,17 +122,26 @@ namespace AillieoUtils.EasyLAN
             this.Broadcast(data, CancellationToken.None);
         }
 
+        public void SendToHost(byte[] data, CancellationToken cancellationToken)
+        {
+            this.Send(this.hostPlayer, data, cancellationToken);
+        }
+
         public void Send(byte target, byte[] data, CancellationToken cancellationToken)
         {
-            var buffer = new ByteBuffer(data.Length);
-            buffer.Append(data);
+            var buffer = new ByteBuffer(0);
+            buffer.Append(Protocols.GetId<CustomBytes>());
+            var proto = new CustomBytes() { bytes = data };
+            proto.Serialize(buffer);
             this.netHandler.SendAsync(target, buffer, cancellationToken).Await();
         }
 
         public void Broadcast(byte[] data, CancellationToken cancellationToken)
         {
-            var buffer = new ByteBuffer(data.Length);
-            buffer.Append(data);
+            var buffer = new ByteBuffer(0);
+            buffer.Append(Protocols.GetId<CustomBytes>());
+            var proto = new CustomBytes() { bytes = data };
+            proto.Serialize(buffer);
             this.netHandler.BroadcastAsync(buffer, cancellationToken).Await();
         }
 
@@ -166,6 +185,21 @@ namespace AillieoUtils.EasyLAN
             }
 
             listener.Stop();
+        }
+
+        private void HandleData(byte player, IProtocol data)
+        {
+            UnityEngine.Debug.Log($"[GAME]: {player} {data} ");
+
+            switch (data)
+            {
+                case SyncNetGameState syncNetGameState:
+                    this.ChangeState(syncNetGameState.state);
+                    break;
+                case CustomBytes customBytes:
+                    this.onPlayerMessage(player, customBytes.bytes);
+                    break;
+            }
         }
     }
 }

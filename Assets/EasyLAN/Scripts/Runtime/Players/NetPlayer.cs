@@ -45,8 +45,8 @@ namespace AillieoUtils.EasyLAN
             var playerId = game.idGenerator.Get();
             netPlayer.id = playerId;
 
-            var instanceId = new InstanceId() { value = playerId };
-            await connection.SendProto(instanceId, cancellationToken);
+            var accept = new AcceptPlayer() { host = game.localPlayer.id, instanceId = playerId };
+            await connection.SendProto(accept, cancellationToken);
 
             netPlayer.state = NetPlayerState.Authenticated;
             netPlayer.connection = connection;
@@ -60,8 +60,8 @@ namespace AillieoUtils.EasyLAN
             netPlayer.flag |= NetPlayerFlag.Remote;
             netPlayer.info = info;
 
-            var instanceId = await connection.RequestProto<NetPlayerInfo, InstanceId>(info, cancellationToken);
-            netPlayer.id = instanceId.value;
+            var accept = await connection.RequestProto<NetPlayerInfo, AcceptPlayer>(info, cancellationToken);
+            netPlayer.id = accept.instanceId;
 
             netPlayer.state = NetPlayerState.Authenticated;
             netPlayer.connection = connection;

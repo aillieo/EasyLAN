@@ -124,9 +124,7 @@ namespace AillieoUtils.EasyLAN
 
             var length = buffer.Length;
             buffer.Prepend(length);
-            var data = buffer.ToArray();
-            buffer.Clear();
-            await this.stream.WriteAsync(data, 0, data.Length, cancellationToken);
+            await this.stream.WriteAsync(buffer, cancellationToken);
         }
 
         private async Task StartReadingDataAsync(CancellationToken cancellationToken)
