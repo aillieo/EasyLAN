@@ -189,8 +189,6 @@ namespace AillieoUtils.EasyLAN
 
         private void HandleData(byte player, IProtocol data)
         {
-            UnityEngine.Debug.Log($"[GAME]: {player} {data} ");
-
             switch (data)
             {
                 case SyncNetGameState syncNetGameState:

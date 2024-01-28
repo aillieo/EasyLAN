@@ -7,12 +7,15 @@
 namespace AillieoUtils.EasyLAN.Sample
 {
     using System.Collections.Generic;
+    using System.Linq;
     using System.Text;
     using System.Threading;
     using UnityEngine;
 
     public class Sample0 : MonoBehaviour
     {
+        private readonly ChatModel model = new ChatModel();
+
         private enum GameState
         {
             NoGame = 1,
@@ -126,7 +129,7 @@ namespace AillieoUtils.EasyLAN.Sample
         {
             foreach (var p in this.netGame0.GetAllPlayers())
             {
-                GUILayout.Label(SampleUtils0.GetPlayerTitle(p));
+                GUILayout.Label(SampleUtils0.GetPlayerTitle(p.id, p.info.playerName));
             }
 
             this.message = GUILayout.TextField(this.message);
@@ -134,7 +137,7 @@ namespace AillieoUtils.EasyLAN.Sample
             if (GUILayout.Button("Send"))
             {
                 var msg = $"[{this.netPlayer0.id}]{this.netPlayer0.info.playerName}: {this.message}";
-                this.netGame0.Broadcast(Encoding.UTF8.GetBytes(msg), this.cancellationTokenSource.Token);
+                this.netGame0.Broadcast(SerializeUtils.Serialize(new Messages.String() { value = msg }), this.cancellationTokenSource.Token);
             }
 
             if (this.netPlayer0.IsHost())
@@ -152,17 +155,18 @@ namespace AillieoUtils.EasyLAN.Sample
         {
             this.message = GUILayout.TextField(this.message);
 
-            foreach (var p in this.netGame0.GetAllPlayers())
+            foreach (var p in model.players)
             {
                 GUILayout.BeginHorizontal();
 
-                GUILayout.Label(SampleUtils0.GetPlayerTitle(p));
+                GUILayout.Label(SampleUtils0.GetPlayerTitle(p.Key, p.Value.netInfo.playerName));
 
                 if (GUILayout.Button("Send"))
                 {
                     // 单点发送
                     var msg = $"[{this.netPlayer0.id}]{this.netPlayer0.info.playerName}: {this.message}";
-                    this.netGame0.Send(p.id, Encoding.UTF8.GetBytes(msg), this.cancellationTokenSource.Token);
+                    UnityEngine.Debug.Log($"[GAME] Send message to {p.Key}: {msg}");
+                    this.netGame0.Send(p.Key, SerializeUtils.Serialize(new Messages.String() { value = msg }), this.cancellationTokenSource.Token);
                 }
 
                 GUILayout.EndHorizontal();
@@ -172,7 +176,8 @@ namespace AillieoUtils.EasyLAN.Sample
             {
                 // 全体发送
                 var msg = $"[{this.netPlayer0.id}]{this.netPlayer0.info.playerName}: {this.message}";
-                this.netGame0.Broadcast(Encoding.UTF8.GetBytes(msg), this.cancellationTokenSource.Token);
+                UnityEngine.Debug.Log($"[GAME] Broadcast message: {msg}");
+                this.netGame0.Broadcast(SerializeUtils.Serialize(new Messages.String() { value = msg }), this.cancellationTokenSource.Token);
             }
         }
 
@@ -266,19 +271,50 @@ namespace AillieoUtils.EasyLAN.Sample
 
         private void OnMessage(byte playerId, byte[] bytes)
         {
-            var str = Encoding.UTF8.GetString(bytes);
-            UnityEngine.Debug.Log($"Receive message from {playerId}: {str}");
-
-            if (str == "Please send me player data!" && this.netPlayer0.IsHost())
+            UnityEngine.Debug.Log($"Receive message from {playerId}: byte[{bytes.Length}]");
+            if (SerializeUtils.Deserialize(bytes, out object o))
             {
-                var players = this.netGame0.GetAllPlayers();
-                var str2 = string.Empty;
-                foreach (var p in players)
+                switch (o)
                 {
-                    str2 += $"{p.id},{p.info.playerName},";
-                }
+                    case Messages.String str:
+                        UnityEngine.Debug.Log($"[GAME] Receive message from {playerId}: {str.value}");
+                        break;
+                    case Messages.ReqPlayers rp:
+                        if (this.netPlayer0.IsHost())
+                        {
+                            var msg = new Messages.PlayerList();
+                            var players = this.netGame0.GetAllPlayers().ToList();
+                            players.Add(this.netPlayer0);
 
-                this.netGame0.Send(playerId, Encoding.UTF8.GetBytes("Player data: " + str2));
+                            msg.players = players
+                                .Select(p => new ChatModel.PlayerInfo()
+                                {
+                                    playerId = p.id,
+                                    netInfo = p.info,
+                                })
+                                .ToArray();
+                            var bytesToSend = SerializeUtils.Serialize(msg);
+                            this.netGame0.Send(playerId, bytesToSend);
+                        }
+
+                        break;
+
+                    case Messages.PlayerList pl:
+                        if (!this.netPlayer0.IsHost())
+                        {
+                            foreach (var p in pl.players)
+                            {
+                                this.model.players.Add(p.playerId, p);
+                            }
+                        }
+
+                        break;
+                }
+            }
+            else
+            {
+                string str = Encoding.UTF8.GetString(bytes);
+                UnityEngine.Debug.LogError(str);
             }
         }
 
@@ -286,9 +322,19 @@ namespace AillieoUtils.EasyLAN.Sample
         {
             if (netGameState == NetGameState.GamePlaying)
             {
-                if (!this.netGame0.localPlayer.IsHost())
+                this.state = GameState.Playing;
+                if (this.netGame0.localPlayer.IsHost())
                 {
-                    this.netGame0.SendToHost(Encoding.UTF8.GetBytes("Please send me player data!"));
+                    foreach (var p in netGame0.GetAllPlayers())
+                    {
+                        model.players.Add(p.id, new ChatModel.PlayerInfo() { playerId = p.id, netInfo = p.info });
+                    }
+                }
+                else
+                {
+                    var msg = new Messages.ReqPlayers();
+                    var bytes = SerializeUtils.Serialize(msg);
+                    this.netGame0.SendToHost(bytes);
                 }
             }
         }

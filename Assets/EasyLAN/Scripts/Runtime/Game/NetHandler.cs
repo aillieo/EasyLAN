@@ -17,10 +17,12 @@ namespace AillieoUtils.EasyLAN
 
         private readonly Dictionary<byte, Action<ByteBuffer>> handlers = new Dictionary<byte, Action<ByteBuffer>>();
 
-        public event Action<byte, IProtocol> onData;
+        internal event Action<byte, IProtocol> onData;
 
         public async Task SendAsync(byte target, ByteBuffer buffer, CancellationToken cancellationToken)
         {
+            UnityEngine.Debug.Log($"[S][?]" + buffer.ToArray().ToStringEx());
+
             var localPlayerId = this.game.localPlayer.id;
             var isHost = this.game.localPlayer.IsHost();
 
@@ -32,6 +34,8 @@ namespace AillieoUtils.EasyLAN
 
             if (isHost)
             {
+                UnityEngine.Debug.Log($"[S][h->?]" + buffer.ToArray().ToStringEx());
+
                 // host发给非host的普通玩家
                 var player = this.game.GetPlayer(target);
                 buffer.Prepend(ChannelFlag.Direct);
@@ -41,15 +45,31 @@ namespace AillieoUtils.EasyLAN
             else
             {
                 // 非host的普通玩家发出
-                buffer.Prepend(localPlayerId);
-                buffer.Prepend(target);
-                buffer.Prepend(ChannelFlag.Forward);
-                await this.game.localPlayer.connection.SendAsync(buffer, cancellationToken);
+                if (target == this.game.hostPlayer)
+                {
+                    UnityEngine.Debug.Log($"[S][?->?]" + buffer.ToArray().ToStringEx());
+
+                    buffer.Prepend(localPlayerId);
+                    buffer.Prepend(target);
+                    buffer.Prepend(ChannelFlag.Forward);
+                    await this.game.localPlayer.connection.SendAsync(buffer, cancellationToken);
+                }
+                else
+                {
+                    UnityEngine.Debug.Log($"[S][?->h]" + buffer.ToArray().ToStringEx());
+
+                    buffer.Prepend(localPlayerId);
+                    buffer.Prepend(target);
+                    buffer.Prepend(ChannelFlag.Forward);
+                    await this.game.localPlayer.connection.SendAsync(buffer, cancellationToken);
+                }
             }
         }
 
         public async Task BroadcastAsync(ByteBuffer buffer, CancellationToken cancellationToken)
         {
+            UnityEngine.Debug.Log($"[S][Broadcast]" + buffer.ToArray().ToStringEx());
+
             var localPlayerId = this.game.localPlayer.id;
             var isHost = this.game.localPlayer.IsHost();
 
@@ -121,11 +141,11 @@ namespace AillieoUtils.EasyLAN
             switch (channel)
             {
                 case ChannelFlag.Direct:
-                    UnityEngine.Debug.Log($"[R][Direct {ChannelFlag.Direct}]" + buffer.ToArray().ToStringEx());
+                    UnityEngine.Debug.Log($"[R][Direct]" + buffer.ToArray().ToStringEx());
                     this.OnData(sender, buffer);
                     break;
                 case ChannelFlag.Broadcast:
-                    UnityEngine.Debug.Log($"[R][Broadcast {ChannelFlag.Broadcast}]" + buffer.ToArray().ToStringEx());
+                    UnityEngine.Debug.Log($"[R][Broadcast]" + buffer.ToArray().ToStringEx());
 
                     if (!isHost)
                     {
@@ -150,7 +170,7 @@ namespace AillieoUtils.EasyLAN
 
                     break;
                 case ChannelFlag.Forward:
-                    UnityEngine.Debug.Log($"[R][Forward {ChannelFlag.Forward}]" + buffer.ToArray().ToStringEx());
+                    UnityEngine.Debug.Log($"[R][Forward]" + buffer.ToArray().ToStringEx());
 
                     var target = buffer.ConsumeByte();
 

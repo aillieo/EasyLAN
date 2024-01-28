@@ -4,19 +4,21 @@
 // </copyright>
 // -----------------------------------------------------------------------
 
-using System.Linq;
-using AillieoUtils.EasyLAN;
-using UnityEngine;
-
-public static class SampleUtils0
+namespace AillieoUtils.EasyLAN.Sample
 {
-    public static string GetRandomName()
-    {
-        return string.Concat(Enumerable.Range(0, 5).Select(_ => (char)Random.Range((short)'A', (short)'Z')));
-    }
+    using System.Linq;
+    using UnityEngine;
 
-    public static string GetPlayerTitle(NetPlayer player)
+    public static class SampleUtils0
     {
-        return $"{(player.IsHost() ? "[H]" : string.Empty)}[{player.id}]{player.info.playerName}";
+        public static string GetRandomName()
+        {
+            return string.Concat(Enumerable.Range(0, 5).Select(_ => (char)Random.Range((short)'A', (short)'Z')));
+        }
+
+        public static string GetPlayerTitle(int playerId, string playerName)
+        {
+            return $"[{playerId}]{playerName}";
+        }
     }
 }

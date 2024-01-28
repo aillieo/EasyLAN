@@ -17,23 +17,17 @@ namespace AillieoUtils.EasyLAN.Sample
             try
             {
                 var head = obj.GetType().FullName;
-                var headBytes = Encoding.UTF8.GetBytes(head);
                 var json = JsonUtility.ToJson(obj);
-                var jsonBytes = Encoding.UTF8.GetBytes(json);
-                var headLength = headBytes.Length;
-                var length = sizeof(int) + headLength + json.Length;
-                var bytes = new byte[sizeof(int) + length];
-                var lengthBytes = BitConverter.GetBytes(length);
-                var headLengthBytes = BitConverter.GetBytes(headLength);
-                var index = 0;
+                UnityEngine.Debug.Log($"[Ser] {head} {json}");
 
-                Array.Copy(lengthBytes, 0, bytes, index, lengthBytes.Length);
-                index += lengthBytes.Length;
-                Array.Copy(headLengthBytes, 0, bytes, index, headLengthBytes.Length);
-                index += headLengthBytes.Length;
-                Array.Copy(headBytes, 0, bytes, index, headBytes.Length);
-                index += headBytes.Length;
-                Array.Copy(jsonBytes, 0, bytes, index, jsonBytes.Length);
+                ByteBuffer buffer = new ByteBuffer(0);
+                buffer.Append(head);
+                buffer.Append(json);
+
+                var bytes = buffer.ToArray();
+                buffer.Clear();
+
+                UnityEngine.Debug.Log($"[Ser] {bytes.ToStringEx()}");
 
                 return bytes;
             }
@@ -48,14 +42,17 @@ namespace AillieoUtils.EasyLAN.Sample
         {
             try
             {
-                var index = 4;
-                var headLength = BitConverter.ToInt32(bytes, index);
-                index += sizeof(int);
-                var head = Encoding.UTF8.GetString(bytes, index, headLength);
-                index += headLength;
-                var json = Encoding.UTF8.GetString(bytes, index, bytes.Length - index);
+                ByteBuffer buffer = new ByteBuffer(bytes);
+
+                UnityEngine.Debug.Log($"[Des] {bytes.ToStringEx()}");
+
+                var head = buffer.ConsumeString();
+                var json = buffer.ConsumeString();
+
+                UnityEngine.Debug.Log($"[Des] {head} {json}");
+
                 var type = Type.GetType(head);
-                obj = JsonUtility.FromJson(json, type) as IProtocol;
+                obj = JsonUtility.FromJson(json, type);
                 return true;
             }
             catch (Exception e)

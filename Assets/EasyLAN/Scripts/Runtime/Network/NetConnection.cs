@@ -47,8 +47,6 @@ namespace AillieoUtils.EasyLAN
             return netConnection;
         }
 
-
-
         public static async Task<NetConnection> AcceptAsync(TcpListener listener, CancellationToken cancellationToken)
         {
             try

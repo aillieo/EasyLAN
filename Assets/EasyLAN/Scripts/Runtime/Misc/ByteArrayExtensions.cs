@@ -8,7 +8,7 @@ namespace AillieoUtils.EasyLAN
 {
     using System.Linq;
 
-    internal static class ByteArrayExtensions
+    public static class ByteArrayExtensions
     {
         public static string ToStringEx(this byte[] bytes)
         {
