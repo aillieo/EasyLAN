@@ -24,15 +24,10 @@ namespace AillieoUtils.EasyLAN
 
         internal static async Task<int> ReadIntAsync(this NetworkStream stream, CancellationToken cancellationToken)
         {
-            var buffer = new ByteBuffer(4);
-            var bytesRead = await stream.ReadAsync(buffer, 4, cancellationToken);
-            if (bytesRead != 4)
-            {
-                return -1;
-            }
-
-            var lengthValue = buffer.ConsumeInt();
-            return lengthValue;
+            var buffer = await ReadBytesAsync(stream, 4, cancellationToken);
+            int value = buffer.ConsumeInt();
+            buffer.Clear();
+            return value;
         }
 
         internal static async Task<ByteBuffer> ReadBytesAsync(this NetworkStream stream, int length, CancellationToken cancellationToken)

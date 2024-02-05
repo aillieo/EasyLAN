@@ -26,9 +26,9 @@ namespace AillieoUtils.EasyLAN
         private static Dictionary<LogChannel, string> channelToTag = new Dictionary<LogChannel, string>()
         {
             { LogChannel.NetSend, "Send" },
-             { LogChannel.NetReceive, "Recv" },
-             { LogChannel.NetForward, "Fwd" },
-             { LogChannel.Game, "Game" },
+            { LogChannel.NetReceive, "Recv" },
+            { LogChannel.NetForward, "Fwd" },
+            { LogChannel.Game, "Game" },
         };
 
         public static void Log(LogChannel channel, object message)

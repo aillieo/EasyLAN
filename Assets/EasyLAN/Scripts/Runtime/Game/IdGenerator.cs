@@ -15,7 +15,7 @@ namespace AillieoUtils.EasyLAN
         private int sid = 0;
 
         public IdGenerator()
-            : this((int)DateTime.Now.Ticks & 0X7fff)
+            : this((int)DateTime.Now.Ticks & 0X7fffffff)
         {
         }
 
